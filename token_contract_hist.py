@@ -8,7 +8,7 @@ file = os.path.basename(__file__)
 str_date = date_today.strftime('%d%m%y')
 print(str_date)
 
-jii
+
 def token_hist():
     token = pd.read_csv(METADATA_DIR + '\\token_contract.csv')
     token = token[token['companyName'].notna()]

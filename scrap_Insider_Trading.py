@@ -75,7 +75,7 @@ def insider_trading():
 
 
 def cleaning_df():
-    insider_trade_sast = pd.read_csv(PROCESSED_DIR + '\\insider_trading_sast.csv')
+    insider_trade_sast = pd.read_csv(PROCESSED_DIR + '\\insider_trading_sast.csv', encoding='cp1252')
     insider_trade_sast['Reported to Exchange'] = pd.to_datetime(insider_trade_sast['Reported to Exchange'],
                                                                 format='%d-%m-%Y')
     insider_trade_sast = insider_trade_sast.rename(columns={"Security Code": "Security_Code"
@@ -93,7 +93,7 @@ def cleaning_df():
 
     insider_trade_sast['chng'] = (insider_trade_sast['Securities_held_pre_Transaction'] /
                                   insider_trade_sast['%_of_Securities_held_pre']) * 100
-    insider_trade_sast['Number'] = insider_trade_sast['Number'].str.replace(',', '').astype(float)
+    insider_trade_sast['Number'] = insider_trade_sast['Number'].astype(str).str.replace(',', '').astype(float)
     insider_trade_sast['final_chng'] = (insider_trade_sast['Number'] / insider_trade_sast['chng']) * 100
     insider_trade_sast = insider_trade_sast[insider_trade_sast['Mode_of_Buy/Sale'].notna()]
     insider_trade_sast = insider_trade_sast.loc[

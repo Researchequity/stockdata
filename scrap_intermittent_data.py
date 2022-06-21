@@ -352,6 +352,135 @@ def new_sast():
     wb.save()
 
 
+def insider_trading():
+    insider_csv = pd.read_csv(r'\\192.168.41.190\program\stockdata\processed\insider_trading_sast.csv', encoding='cp1252')
+    insider_csv['Reported to Exchange'] = pd.to_datetime(insider_csv['Reported to Exchange'], format='%d-%m-%Y')
+    qtr = []
+
+    # to get quater month
+    for val in insider_csv['Reported to Exchange']:
+        quarter = (val.month - 1) // 3 + 1
+        if quarter == 4:
+            Qtr_date = datetime.datetime(val.year, 12, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 1:
+            Qtr_date = datetime.datetime(val.year, 3, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 2:
+            Qtr_date = datetime.datetime(val.year, 6, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        else:
+            Qtr_date = datetime.datetime(val.year, 9, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+
+    qtr_df = pd.DataFrame(qtr)
+    qtr_df = pd.DataFrame(qtr_df.values.reshape(-1, 2), columns=['qtr', 'Reported_toExchange_Date'])
+    qtr_df = (qtr_df.drop_duplicates(subset=['qtr', 'Reported_toExchange_Date']))
+
+    df_final = pd.merge(insider_csv, qtr_df, how='left', left_on='Reported to Exchange', right_on='Reported_toExchange_Date')
+
+    # today data
+    today = dt.now()
+    # today = datetime.datetime(2021, 9, 21)
+    df_today = df_final[df_final['Reported to Exchange'] >= today - relativedelta(days=1)]
+
+    # df_today.drop(['Name_of_Acquirer/Seller', 'Mode_of_Buy/Sale', 'HAT_Quantity',
+    #                'HAT_%_(w.r.t_Total_Capital)', 'HAT_%_(w.r.t_Diluted_Capital)',
+    #                'Reported_toExchange_Date_x', 'Reported_toExchange_Date_y'], inplace=True, axis=1)
+
+    # filters and group
+    df_final = df_final[(df_final['Category of person'] == 'Promoter Group') |
+                        (df_final['Category of person'] == 'Promoter & Director') |
+                        (df_final['Category of person'] == 'Promoter')|
+                        (df_final['Category of person'] == 'Promoters Immediate Relative')|
+                        (df_final['Category of person'] == 'Promoter and Director')]
+
+    df_final = df_final[(df_final['Transaction Type'] == 'Acquisition') | (df_final['Transaction Type'] == 'Disposal')]
+    df_final = df_final[(df_final['Mode of  Acquisition'] == 'Market') |
+                        (df_final['Mode of  Acquisition'] == 'Market Sale') |
+                        (df_final['Mode of  Acquisition'] == 'Market Purchase')]
+
+    df_final['Securities_held_post_Transaction'] = df_final['Securities_held_post_Transaction'].fillna(0).astype(int)
+    df_final['%_of_Securities_held_post'] = df_final['%_of_Securities_held_post'].astype(float).fillna(0)
+    df_final = df_final.groupby(['Security Code', 'Security Name', 'Transaction Type', 'qtr']).agg(
+        {'Securities_held_post_Transaction': ['sum', 'count'], '%_of_Securities_held_post': ['sum']}).reset_index()
+    df_final.columns = ['Security_Code', 'Security_Name', 'Transaction Type', 'qtr', 'Securities_held_post_sum',
+                        'count', '%_of_Securities_held_post_sum']
+
+    df_final['%_of_Securities_held_post_sum'] = df_final['%_of_Securities_held_post_sum'].astype(float)
+    df_final.sort_values(by=['%_of_Securities_held_post_sum'], ascending=False,
+                         inplace=True)  # desc
+    df_final = df_final[df_final['Securities_held_post_sum'] != 0]
+
+    Disposal = df_final[df_final['Transaction Type'] == 'Disposal']
+
+    Acquisition = df_final[df_final['Transaction Type'] == 'Acquisition']
+    net_df = pd.merge(Acquisition, Disposal, on=['Security_Code', 'qtr'], how='outer')
+
+    net_df['net_share'] = net_df['Securities_held_post_sum_x'].fillna(0) - net_df[
+        'Securities_held_post_sum_y'].fillna(0)
+    net_df['net_share_perct'] = net_df['%_of_Securities_held_post_sum_x'].fillna(0) - net_df[
+        '%_of_Securities_held_post_sum_y'].fillna(0)
+
+    Acquisition = net_df[net_df['net_share'] > 0]
+    Acquisition.drop(['Security_Name_y', 'Transaction Type_y', 'Securities_held_post_sum_y', 'count_y',
+                      '%_of_Securities_held_post_sum_y'], inplace=True, axis=1)
+    Acquisition['qtr'] = pd.to_datetime(Acquisition['qtr'], format='%B %Y')
+    Acquisition.sort_values(by=['qtr', 'net_share_perct'], ascending=False, inplace=True)
+    Acquisition['qtr'] = Acquisition['qtr'].dt.strftime('%b-%y')
+
+    Disposal = net_df[net_df['net_share'] < 0]
+    Disposal.drop(['Security_Name_x', 'Transaction Type_x', 'Securities_held_post_sum_x', 'count_x',
+                   '%_of_Securities_held_post_sum_x'], inplace=True, axis=1)
+    Disposal['qtr'] = pd.to_datetime(Disposal['qtr'], format='%B %Y')
+    Disposal['net_share'] = abs(Disposal['net_share'])
+    Disposal['net_share_perct'] = abs(Disposal['net_share_perct'])
+    Disposal.sort_values(by=['qtr', 'net_share_perct'], ascending=False, inplace=True)
+    Disposal['qtr'] = Disposal['qtr'].dt.strftime('%b-%y')
+
+    # dump data to excel
+    sheet_oi_single = wb.sheets('insider_dis')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A1").options(index=None).value = Disposal
+    Disposal = Disposal.head(37)
+    format_dict = {'Security_Code': '{:.0f}', 'count_y': '{:.0f}', 'net_share': '{:.0f}', 'net_share_perct': '{:.2f}'}
+    Disposal = (Disposal.style.hide_index().format(format_dict)
+                .bar(color='#FFA07A', vmin=100_000, subset=['net_share_perct'], align='zero'))
+    dfi.export(Disposal, SS_DIR + "\\Disposal.png")
+
+    sheet_oi_single = wb.sheets('insider_acq')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A1").options(index=None).value = Acquisition
+    Acquisition = Acquisition.head(37)
+    format_dict = {'Security_Code': '{:.0f}', 'count_x': '{:.0f}', 'net_share': '{:.0f}', 'net_share_perct': '{:.2f}'}
+    Acquisition = (Acquisition.style.hide_index().format(format_dict)
+                   .bar(color='#FFA07A', vmin=100_000, subset=['net_share_perct'], align='zero'))
+    dfi.export(Acquisition, SS_DIR + "\\Acquisition.png")
+
+    sheet_oi_single = wb.sheets('today_data_sast')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A1").options(index=None).value = df_today
+    df_today = df_today.round({"Warrants_Transacted_quantity": 2})
+    df_today = df_today.style.hide_index()
+    dfi.export(df_today, SS_DIR + "\\today_data_sast.png")
+
+
 def bulk_nse():
     dls = "https://archives.nseindia.com/content/equities/bulk.csv"
     urllib.request.urlretrieve(dls, RAW_DIR + "\\bulk.csv")
@@ -1045,6 +1174,8 @@ if __name__ == '__main__':
         ic('sast')
         new_sast()
         ic('new_sast')
+        insider_trading()
+        ic('insider_trading')
     except Exception as e:
         print(e)
         pass

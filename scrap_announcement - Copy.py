@@ -3,42 +3,11 @@ import mimetypes
 from email.utils import make_msgid
 from utils import *
 from email.mime.text import MIMEText
-import requests
 import time
 
 TODAY_DATE = datetime.date.today()
 file = os.path.basename(__file__)
 linkarray = []
-
-
-def pdf_download(pdf_df,folder_name):
-    pdf_df = pdf_df[['pdf_link', 'script_code', 'Exchange_Received']]
-    pdf_df['Exchange_Received'] = pd.to_datetime(pdf_df['Exchange_Received'], format='%d-%m-%Y %H:%M')
-    pdf_df['Exchange_Received'] = pdf_df['Exchange_Received'].dt.strftime('%Y-%m-%d')
-    pdf_df.sort_values(by=['Exchange_Received'], inplace=True, ascending=True)
-    pdf_df['Exchange_Received'] = pd.to_datetime(pdf_df['Exchange_Received'], format='%Y-%m-%d')
-    pdf_df['Exchange_Received'] = pdf_df['Exchange_Received'].dt.strftime('%d-%m-%Y')
-    pdf_df.reset_index(drop=True)
-
-    for i in range(0, len(pdf_df)):
-        url = pdf_df['pdf_link'].iloc[i]
-        sc = pdf_df['script_code'].iloc[i]
-        date = pdf_df['Exchange_Received'].iloc[i]
-
-        filename = str(sc) + '_' + str(date)
-
-        user_agent = {'User-agent': 'Mozilla/5.0'}
-        s = requests.Session()
-        r = s.get(str(url), headers=user_agent)
-        if (r.status_code == 200):
-            with open(r'\\192.168.41.190\report'+'\\'+folder_name + '\\' + filename + ".pdf", 'wb') as fd:
-                for chunk in r.iter_content(chunk_size=1024):
-                    fd.write(chunk)
-        else:
-            print("Link is Expire")
-
-        if (i % 100 == 0):
-            time.sleep(10)
 
 
 def sendmail_fund(pdf_link,df,sub):
@@ -192,14 +161,6 @@ def calculations(table_df_csv):
             ic(latest_date)
             check = table_df_csv[table_df_csv['Exchange_Received'] > latest_date]
 
-            Transcript_df = check[check['name'].str.contains('Transcript')]
-            Inv_Presentation_df = check[check['name'].str.contains('Investor Presentation')]
-
-            if not Transcript_df.empty:
-                pdf_download(Transcript_df, folder_name="Concall")
-            elif not Inv_Presentation_df.empty:
-                pdf_download(Inv_Presentation_df, folder_name="inv_presentation")
-
             if not check.empty:
                 Historical = pd.concat([check, Historical])
                 Historical['Exchange_Received'] = Historical['Exchange_Received'].dt.strftime('%d-%m-%Y %H:%M')
@@ -208,8 +169,7 @@ def calculations(table_df_csv):
                 Historical = Historical[~Historical['name'].str.contains('Closure of Trading Window')]
                 Historical = Historical[~Historical['name'].str.contains('Debt Securities')]
                 Historical = Historical[~Historical['name'].str.contains('Tax deduction at source')]
-                # fund_raise_csv = Historical[(Historical['name'].str.contains('Fund Raising'))]
-                fund_raise_csv = Historical[(Historical['name'].str.contains('Fund Raising')) | (Historical['name'].str.contains('Right issue'))]
+                fund_raise_csv = Historical[(Historical['name'].str.contains('Fund Raising'))]
                 fund_raise_csv.to_csv(RAW_DIR + '\\fund_raise.csv', index=False)
                 Historical.to_csv(METADATA_DIR + '\\announcement.csv', index=False)
                 super_scripts_df = pd.read_csv(METADATA_DIR + '\\announcement_superScripts.csv',
@@ -233,9 +193,7 @@ def calculations(table_df_csv):
                     sendmail(pdf_link,super_scripts,sub)
                     print('mail sent')
 
-                # super_scripts = check[(check['name'].str.contains('Fund Raising'))]
-                super_scripts = check[(check['name'].str.contains('Fund Raising')) |
-                                      (check['name'].str.contains('Right issue'))]
+                super_scripts = check[(check['name'].str.contains('Fund Raising'))]
                 super_scripts = super_scripts[~super_scripts['name'].str.contains('Debt Securities')]
                 super_scripts = pd.DataFrame(super_scripts)
                 pdf_link = super_scripts['pdf_link']
