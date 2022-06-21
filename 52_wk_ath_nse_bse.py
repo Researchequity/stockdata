@@ -120,7 +120,7 @@ def scrape_bse():
         print(e)
     driver.close()
 
-
+# im test
 def all_time_high_update():
     alltime52wkhigh = pd.read_csv(METADATA_DIR + '\\alltime52wkhigh.csv')
 
