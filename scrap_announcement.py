@@ -192,7 +192,7 @@ def calculations(table_df_csv):
             ic(latest_date)
             check = table_df_csv[table_df_csv['Exchange_Received'] > latest_date]
 
-            Transcript_df = check[check['name'].str.contains('Transcript')]
+            Transcript_df = check[check['name'].str.contains('Earnings Call Transcript')]
             Inv_Presentation_df = check[check['name'].str.contains('Investor Presentation')]
 
             if not Transcript_df.empty:

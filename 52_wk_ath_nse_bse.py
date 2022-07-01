@@ -95,6 +95,16 @@ def scrape_bse():
     try:
         table_df_csv = scrape_table()
         table_df_csv.to_csv(RAW_DIR + '\\' + 'BSE_Data_' + str(cd) + '.csv', index=None)
+
+        table_df_csv['Date']=cd
+        table_df_csv = table_df_csv[['Date', 'Security Code', 'Security Name', 'LTP', '52 Weeks High', 'Previous 52 Weeks High Price',
+                 'Previous 52 Weeks High Date', 'All Time High Price', 'All Time High Date']]
+
+        if not os.path.exists(PROCESSED_DIR + '\\' + 'Historical_52_Wk_High.csv'):
+            table_df_csv.to_csv(PROCESSED_DIR + '\\' + 'Historical_52_Wk_High.csv', index=None)
+        else:
+            table_df_csv.to_csv(PROCESSED_DIR + '\\' + 'Historical_52_Wk_High.csv', mode='a', index=None,header=None)
+
         i = 0
         pagenumber = 1
         while i < 12:
@@ -114,6 +124,13 @@ def scrape_bse():
                 table_df_csv1 = scrape_table()
                 table_df_csv1.to_csv(RAW_DIR + '\\' + 'BSE_Data_' + str(cd) + '.csv', mode='a', index=None,
                                      header=None)
+
+                table_df_csv1['Date'] = cd
+                table_df_csv1 = table_df_csv1[['Date', 'Security Code', 'Security Name', 'LTP', '52 Weeks High', 'Previous 52 Weeks High Price',
+                     'Previous 52 Weeks High Date', 'All Time High Price', 'All Time High Date']]
+                table_df_csv1.to_csv(PROCESSED_DIR + '\\' + 'Historical_52_Wk_High.csv', mode='a', index=None,
+                                     header=None)
+
             except:
                 break
     except Exception as e:
@@ -149,7 +166,6 @@ def all_time_high_update():
     df_merge1["52 Wk High Price"] = df_merge1[["52 Wk High Price", "HighPrice"]].max(axis=1)
 
     max_date = np.datetime64(dt.datetime.today())
-
     df_merge1['all_time_high_Date'] = pd.to_datetime(df_merge1['all_time_high_Date'], format='%Y-%m-%d')
     df_merge1['52 Wk High Date'] = pd.to_datetime(df_merge1['52 Wk High Date'], format='%Y-%m-%d')
     df_merge1['date_diff_frm_today_ath'] = (max_date - df_merge1['all_time_high_Date']).dt.days

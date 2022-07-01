@@ -35,6 +35,7 @@ def Analysis(df,filename):
                 data['Strength_ratio'] = round(data['moving_avg_20_current'] / data['moving_avg_20_current'].shift(10), 2)
 
                 data['Strength'] = np.where((data['Close'] > data['moving_avg_20_current']) & (data['moving_avg_20_current'] > data['moving_avg_20_current'].shift(10)), 1, 0)
+                data['Weakness'] = np.where((data['Close'] < data['moving_avg_20_current']) & (data['moving_avg_20_current'] < data['moving_avg_20_current'].shift(10)), 1, 0)
                 data['Engulfing'] = np.where((data['High'] > data['High'].shift(1)) & (data['Low'] < data['Low'].shift(1)), 1, 0)
                 avg_all.append(data)
 

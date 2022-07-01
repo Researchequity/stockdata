@@ -26,6 +26,211 @@ wb = xw.Book(data_excel_file)
 # wb = xw.Book(REPORT_DIR + "\\intermedent.xlsm")
 
 
+def week_high():
+    df = pd.read_csv(PROCESSED_DIR+'\\'+'Historical_52_Wk_High.csv')
+
+    df['Date'] = pd.to_datetime(df['Date'], format='%d-%m-%Y')
+    df.sort_values(by=['Date'], inplace=True, ascending=True)
+
+    df = df[df['Date'] >= (pd.datetime.today() - pd.Timedelta(days=90)).strftime("%d-%m-%Y")]
+
+    data = []
+    sript_name_list = df['Security Name'].unique().tolist()
+    for sn in sript_name_list:
+        merge_sn = df[df['Security Name'] == sn]
+
+        merge_sn['Date'] = pd.to_datetime(merge_sn['Date'], format='%d-%m-%Y')
+        merge_sn.sort_values(by=['Date'], inplace=True, ascending=True)
+
+        Script_Code = merge_sn['Security Code'].tail(1).tolist()
+        Latest_52_Wk_High_Date = merge_sn['Date'].tail(1).tolist()
+
+        Last30_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=30)).strftime("%d-%m-%Y")]
+        Last30_Days = len(Last30_Days['Security Name'])
+
+        Last60_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=60)).strftime("%d-%m-%Y")]
+        Last60_Days = len(Last60_Days['Security Name'])
+
+        Last90_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=90)).strftime("%d-%m-%Y")]
+        Last90_Days = len(Last90_Days['Security Name'])
+
+        data.append([Script_Code[0], sn, Latest_52_Wk_High_Date[0], Last30_Days, Last60_Days, Last90_Days])
+    table_df_csv = pd.DataFrame(data)
+    table_df_csv = pd.DataFrame(table_df_csv.values.reshape(-1, 6),
+                                columns=['script_code','Security Name', 'Latest 52 Weeks High Date', 'Last30_Days', 'Last60_Days',
+                                         'Last90_Days'])
+
+    StockMetadata = pd.read_csv(METADATA_DIR+'\\'+'StockMetadata.csv')[['script_code', 'MarketCap', 'totalMarketCap']]
+
+    StockMetadata['script_code']=StockMetadata['script_code'].astype('object')
+    merge = pd.merge(table_df_csv, StockMetadata, on=['script_code'], how='left')
+
+
+    workbook = xw.Book(REPORT_DIR+'\\'+'intermedent.xlsm')
+    ws1 = workbook.sheets['52_Wk_High_Data_Summary']
+    ws1.clear()
+    ws1.range("A1").options(index=None).value = merge
+
+
+def count_announcement():
+    df = pd.read_csv(METADATA_DIR+'\\'+'Historical_Announcement.csv')
+    df = df.drop_duplicates()
+
+    Pattern = re.compile('Investor Meet - Intimation')
+    df = df[df['name'].str.contains(Pattern)]
+
+    qtr = []
+    df['Exchange_Received'] = pd.to_datetime(df['Exchange_Received'], format='%d-%m-%Y %H:%M')
+    df.sort_values(by=['Exchange_Received'], inplace=True, ascending=False)
+
+    for val in df['Exchange_Received']:
+        quarter = (val.month - 1) // 3 + 1
+        if quarter == 4:
+            Qtr_date = datetime.datetime(val.year, 12, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 1:
+            Qtr_date = datetime.datetime(val.year, 3, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 2:
+            Qtr_date = datetime.datetime(val.year, 6, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        else:
+            Qtr_date = datetime.datetime(val.year, 9, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+
+    qtr_df = pd.DataFrame(qtr)
+    qtr_df = pd.DataFrame(qtr_df.values.reshape(-1, 2), columns=['qtr', 'Reported_toExchange_Date'])
+    qtr_df = (qtr_df.drop_duplicates(subset=['qtr', 'Reported_toExchange_Date']))
+
+    qtr_df = qtr_df[['Reported_toExchange_Date', 'qtr']]
+    qtr_df.rename(columns={'Reported_toExchange_Date': 'Exchange_Received'}, inplace=True)
+    qtr_df = pd.merge(qtr_df, df, on=['Exchange_Received'], how='left')
+
+    qtrdata = qtr_df['qtr'].unique().tolist()
+    df_merge = pd.DataFrame()
+    for q in range(0, len(qtrdata)):
+        data = qtr_df[qtr_df['name'].str.contains(Pattern) & qtr_df['qtr'].str.contains(qtrdata[q])]
+        group = data.groupby(['name', 'script_code', 'qtr']).size().sort_values(ascending=False).reset_index(
+            name='count')
+        df_merge = pd.concat([df_merge, group], ignore_index=True)
+
+    pivot = pd.pivot_table(df_merge, index=['name', 'script_code'], columns=['qtr'], values=['count'], aggfunc=np.sum)
+
+    pivot.columns = pivot.columns.droplevel(0)
+    pivot = pivot.reset_index().rename_axis(None, axis=1)
+
+    qtrdata.insert(0, 'script_code')
+    qtrdata.insert(0, 'name')
+
+    pivot = pivot[qtrdata]
+
+    AVG = pivot[pivot.columns[4:len(pivot.columns)]]
+    pivot['Ratio_Avg'] = pivot[pivot.columns[2]] / (AVG.mean(axis=1))
+
+    workbook = xw.Book(REPORT_DIR+'\\'+'intermedent.xlsm')
+    ws1 = workbook.sheets['Count_Investor_Meet']
+    ws1.clear()
+    ws1.range('A1').options(index=False).value = pivot
+    workbook.save()
+
+
+def investor_meet_by_participant():
+    df = pd.read_csv(RAW_DIR +'\\'+'Invester_Meet_No_Participant.csv')
+    df = df.drop_duplicates()
+
+    df['Number_Of_Participat'] = df['Number_Of_Participat'].replace(0, 1)
+
+    qtr = []
+    df['Exchange_Received'] = pd.to_datetime(df['Exchange_Received'], format='%d-%m-%Y')
+    df.sort_values(by=['Exchange_Received'], inplace=True, ascending=False)
+
+    for val in df['Exchange_Received']:
+        quarter = (val.month - 1) // 3 + 1
+        if quarter == 4:
+            Qtr_date = datetime.datetime(val.year, 12, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 1:
+            Qtr_date = datetime.datetime(val.year, 3, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 2:
+            Qtr_date = datetime.datetime(val.year, 6, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        else:
+            Qtr_date = datetime.datetime(val.year, 9, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+
+    qtr_df = pd.DataFrame(qtr)
+    qtr_df = pd.DataFrame(qtr_df.values.reshape(-1, 2), columns=['qtr', 'Reported_toExchange_Date'])
+    qtr_df = (qtr_df.drop_duplicates(subset=['qtr', 'Reported_toExchange_Date']))
+
+    qtr_df = qtr_df[['Reported_toExchange_Date', 'qtr']]
+    qtr_df.rename(columns={'Reported_toExchange_Date': 'Exchange_Received'}, inplace=True)
+    qtr_df = pd.merge(qtr_df, df, on=['Exchange_Received'], how='left')
+
+    qtrdata = qtr_df['qtr'].unique().tolist()
+
+    df_merge = pd.DataFrame()
+    for q in range(0, len(qtrdata)):
+        data = qtr_df[qtr_df['qtr'].str.contains(qtrdata[q])]
+        group = data.groupby(['name', 'script_code', 'qtr']).size().sort_values(ascending=False).reset_index(
+            name='Number_Of_Participat')
+        df_merge = pd.concat([df_merge, group], ignore_index=True)
+
+    pivot = pd.pivot_table(df_merge, index=['name', 'script_code'], columns=['qtr'], values=['Number_Of_Participat'],
+                           aggfunc=np.sum)
+
+    pivot.columns = pivot.columns.droplevel(0)
+    pivot = pivot.reset_index().rename_axis(None, axis=1)
+
+    qtrdata.insert(0, 'script_code')
+    qtrdata.insert(0, 'name')
+    pivot = pivot[qtrdata]
+
+    AVG = pivot[pivot.columns[4:len(pivot.columns)]]
+    pivot['Average'] = AVG.mean(axis=1)
+    pivot['Ratio_Avg'] = pivot[pivot.columns[2]] / pivot['Average']
+
+    workbook = xw.Book(REPORT_DIR+'\\'+'intermedent.xlsm')
+    ws1 = workbook.sheets['Count_Invester_Meet_Participant']
+    ws1.clear()
+    ws1.range("A1").options(index=None).value = pivot
+
+
+
+
+
 def sast():
     driver = webdriver.Chrome(ChromeDriverManager().install(), options=browser_profile())
     driver.get("https://www.bseindia.com/corporates/Sast.html")
@@ -400,10 +605,6 @@ def insider_trading():
     # today = datetime.datetime(2021, 9, 21)
     df_today = df_final[df_final['Reported to Exchange'] >= today - relativedelta(days=1)]
 
-    # df_today.drop(['Name_of_Acquirer/Seller', 'Mode_of_Buy/Sale', 'HAT_Quantity',
-    #                'HAT_%_(w.r.t_Total_Capital)', 'HAT_%_(w.r.t_Diluted_Capital)',
-    #                'Reported_toExchange_Date_x', 'Reported_toExchange_Date_y'], inplace=True, axis=1)
-
     # filters and group
     df_final = df_final[(df_final['Category of person'] == 'Promoter Group') |
                         (df_final['Category of person'] == 'Promoter & Director') |
@@ -416,69 +617,63 @@ def insider_trading():
                         (df_final['Mode of  Acquisition'] == 'Market Sale') |
                         (df_final['Mode of  Acquisition'] == 'Market Purchase')]
 
-    df_final['Securities_held_post_Transaction'] = df_final['Securities_held_post_Transaction'].fillna(0).astype(int)
-    df_final['%_of_Securities_held_post'] = df_final['%_of_Securities_held_post'].astype(float).fillna(0)
+    df_final['Number'] = df_final['Number'].astype(float)
     df_final = df_final.groupby(['Security Code', 'Security Name', 'Transaction Type', 'qtr']).agg(
-        {'Securities_held_post_Transaction': ['sum', 'count'], '%_of_Securities_held_post': ['sum']}).reset_index()
-    df_final.columns = ['Security_Code', 'Security_Name', 'Transaction Type', 'qtr', 'Securities_held_post_sum',
-                        'count', '%_of_Securities_held_post_sum']
+        {'Number': ['sum', 'count']}).reset_index()
+    df_final.columns = ['Security_Code', 'Security_Name', 'Transaction Type', 'qtr', 'Number_sum',
+                        'count']
 
-    df_final['%_of_Securities_held_post_sum'] = df_final['%_of_Securities_held_post_sum'].astype(float)
-    df_final.sort_values(by=['%_of_Securities_held_post_sum'], ascending=False,
+    df_final['Number_sum'] = df_final['Number_sum'].astype(float)
+    df_final.sort_values(by=['qtr'], ascending=False,
                          inplace=True)  # desc
-    df_final = df_final[df_final['Securities_held_post_sum'] != 0]
+    
+    df_final = df_final[df_final['Number_sum'] != 0]
 
     Disposal = df_final[df_final['Transaction Type'] == 'Disposal']
 
     Acquisition = df_final[df_final['Transaction Type'] == 'Acquisition']
     net_df = pd.merge(Acquisition, Disposal, on=['Security_Code', 'qtr'], how='outer')
 
-    net_df['net_share'] = net_df['Securities_held_post_sum_x'].fillna(0) - net_df[
-        'Securities_held_post_sum_y'].fillna(0)
-    net_df['net_share_perct'] = net_df['%_of_Securities_held_post_sum_x'].fillna(0) - net_df[
-        '%_of_Securities_held_post_sum_y'].fillna(0)
+    net_df['net_share'] = net_df['Number_sum_x'].fillna(0) - net_df[
+        'Number_sum_y'].fillna(0)
+
+    sum_base = pd.read_csv(r'\\192.168.41.190\program\stockdata\processed\sum_base_shareholdings.csv')[['Scrip_code',
+                                                                                                        'Total_no._shares_held_promoter',
+                                                                                                        'Total_no._shares_held_all_sum']]
 
     Acquisition = net_df[net_df['net_share'] > 0]
-    Acquisition.drop(['Security_Name_y', 'Transaction Type_y', 'Securities_held_post_sum_y', 'count_y',
-                      '%_of_Securities_held_post_sum_y'], inplace=True, axis=1)
-    Acquisition['qtr'] = pd.to_datetime(Acquisition['qtr'], format='%B %Y')
-    Acquisition.sort_values(by=['qtr', 'net_share_perct'], ascending=False, inplace=True)
-    Acquisition['qtr'] = Acquisition['qtr'].dt.strftime('%b-%y')
+    Acquisition.drop(['Security_Name_y', 'Transaction Type_y', 'Number_sum_y', 'count_y', 'Number_sum_x'], inplace=True, axis=1)
+    # Acquisition['qtr'] = pd.to_datetime(Acquisition['qtr'], format='%B %Y')
+    # Acquisition['qtr'] = Acquisition['qtr'].dt.strftime('%b-%y')
+    Acquisition = pd.merge(Acquisition, sum_base, how='left', left_on='Security_Code', right_on='Scrip_code')
+    Acquisition['shares_promotor_holdings'] = ((Acquisition['Total_no._shares_held_promoter'] / Acquisition['Total_no._shares_held_all_sum']) * 100).round(2)
+    Acquisition['net_chng_perct']= ((Acquisition['net_share'] / Acquisition['Total_no._shares_held_all_sum'] )* 100).round(2)
+    Acquisition.drop(['Total_no._shares_held_promoter', 'Total_no._shares_held_all_sum', 'Scrip_code'], inplace=True, axis=1)
+    Acquisition.sort_values(by=['net_chng_perct'], ascending=False,
+                         inplace=True)
 
     Disposal = net_df[net_df['net_share'] < 0]
-    Disposal.drop(['Security_Name_x', 'Transaction Type_x', 'Securities_held_post_sum_x', 'count_x',
-                   '%_of_Securities_held_post_sum_x'], inplace=True, axis=1)
-    Disposal['qtr'] = pd.to_datetime(Disposal['qtr'], format='%B %Y')
+    Disposal.drop(['Security_Name_x', 'Transaction Type_x', 'Number_sum_x', 'count_x', 'Number_sum_y'], inplace=True, axis=1)
+    # Disposal['qtr'] = pd.to_datetime(Disposal['qtr'], format='%B %Y')
     Disposal['net_share'] = abs(Disposal['net_share'])
-    Disposal['net_share_perct'] = abs(Disposal['net_share_perct'])
-    Disposal.sort_values(by=['qtr', 'net_share_perct'], ascending=False, inplace=True)
-    Disposal['qtr'] = Disposal['qtr'].dt.strftime('%b-%y')
+    # Disposal['qtr'] = Disposal['qtr'].dt.strftime('%b-%y')
+    Disposal = pd.merge(Disposal, sum_base, how='left', left_on='Security_Code', right_on='Scrip_code')
+    Disposal['shares_promotor_holdings'] = ((Disposal['Total_no._shares_held_promoter'] / Disposal[
+        'Total_no._shares_held_all_sum']) * 100).round(2)
+    Disposal['net_chng_perct'] = ((Disposal['net_share'] / Disposal['Total_no._shares_held_all_sum']) * 100).round(2)
+    Disposal.drop(['Total_no._shares_held_promoter', 'Total_no._shares_held_all_sum', 'Scrip_code'], inplace=True, axis=1)
+    Disposal.sort_values(by=['net_chng_perct'], ascending=False,
+                            inplace=True)
 
     # dump data to excel
     sheet_oi_single = wb.sheets('insider_dis')
     sheet_oi_single.clear()
     sheet_oi_single.range("A1").options(index=None).value = Disposal
-    Disposal = Disposal.head(37)
-    format_dict = {'Security_Code': '{:.0f}', 'count_y': '{:.0f}', 'net_share': '{:.0f}', 'net_share_perct': '{:.2f}'}
-    Disposal = (Disposal.style.hide_index().format(format_dict)
-                .bar(color='#FFA07A', vmin=100_000, subset=['net_share_perct'], align='zero'))
-    dfi.export(Disposal, SS_DIR + "\\Disposal.png")
 
     sheet_oi_single = wb.sheets('insider_acq')
     sheet_oi_single.clear()
     sheet_oi_single.range("A1").options(index=None).value = Acquisition
-    Acquisition = Acquisition.head(37)
-    format_dict = {'Security_Code': '{:.0f}', 'count_x': '{:.0f}', 'net_share': '{:.0f}', 'net_share_perct': '{:.2f}'}
-    Acquisition = (Acquisition.style.hide_index().format(format_dict)
-                   .bar(color='#FFA07A', vmin=100_000, subset=['net_share_perct'], align='zero'))
-    dfi.export(Acquisition, SS_DIR + "\\Acquisition.png")
-
-    sheet_oi_single = wb.sheets('today_data_sast')
-    sheet_oi_single.clear()
-    sheet_oi_single.range("A1").options(index=None).value = df_today
-    df_today = df_today.round({"Warrants_Transacted_quantity": 2})
-    df_today = df_today.style.hide_index()
-    dfi.export(df_today, SS_DIR + "\\today_data_sast.png")
+    wb.save()
 
 
 def bulk_nse():
@@ -1160,6 +1355,19 @@ if __name__ == '__main__':
     fund_raise = pd.read_csv(RAW_DIR + '\\fund_raise.csv')
     sheet_oi_single.range("A2").options(index=None).value = fund_raise
     wb.save()
+
+    try:
+        week_high()
+        ic('week_high')
+        count_announcement()
+        ic('count_announcement')
+        investor_meet_by_participant()
+        ic('investor_meet_by_participant')
+
+    except Exception as e:
+        print(e)
+        pass
+
 
     try:
         bulk_nse()

@@ -4,14 +4,13 @@ from utils import *
 import time
 start_time = time.time()
 
+#code updated
 date_today = datetime.date.today() #- datetime.timedelta(days=1)
 date_today, prev_date, fut_date = get_market_prev_date_fut_date(date_today)
 
 date_today = date_today.strftime('%d%m%y')
 
-
 timenow = dt.now().strftime('%H:%M')
-
 
 def get_public_holding():
     df_base_pub = pd.read_csv(PROCESSED_DIR + '\\latest_base_shareholdings.csv')
