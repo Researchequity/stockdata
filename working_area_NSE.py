@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from utils import *
 from datetime import datetime
 
@@ -196,10 +197,6 @@ final_merged1.drop(['script_code'], inplace=True, axis=1)
 final_merged1['del_pub_perct'] = round(final_merged1['deliveryQuantity'] * 100 / final_merged1['public_shares_held'], 1)
 final_merged1['equity_pub_change_2'] = np.where(final_merged1['del_pub_perct'] > 2, 1, 0)
 
-import xlwings as xw
-
-data_excel_file = r"D:\Program\python_ankit\Equity_Live_Data.xlsm"
-wb = xw.Book(data_excel_file)
 
 historical_Stock = final_merged1[
     (final_merged1['Price_Trend'].isin(['PosAboveATP'])) & (final_merged1['Star'].isin(['Morning Star', 'EOD Star']))]
@@ -230,17 +227,22 @@ Working_df_all = Working_df_all[
     Working_df_all['Stock'].isin(Today_Stock_list) & Working_df_all['secWiseDelPosDate'].isin(date_list)]
 Working_df_all['secWiseDelPosDate'] = Working_df_all['secWiseDelPosDate'].dt.strftime('%Y-%m-%d')
 
-sheet_oi_single = wb.sheets("Historical_del_data")
-sheet_oi_single.range("A1").options(index=False).value = Working_df_all
+import xlwings as xw
+
+#data_excel_file = r"D:\Program\python_ankit\Equity_Live_Data.xlsm"
+#wb = xw.Book(data_excel_file)
+
+#sheet_oi_single = wb.sheets("Historical_del_data")
+#sheet_oi_single.range("A1").options(index=False).value = Working_df_all
 
 # ##Dump Output in Excel
 final_merged1['secWiseDelPosDate'] = pd.to_datetime(final_merged1['secWiseDelPosDate'], format='%d-%m-%Y %H:%M')
 final_merged1['secWiseDelPosDate'] = final_merged1['secWiseDelPosDate'].dt.strftime('%d-%m-%Y %H:%M')
 final_merged1.to_csv(PROCESSED_DIR + "\\working_area_NSE" + "\\Working_Area_{}.csv".format(date), index=False)
 
-sheet_oi_single = wb.sheets("Working_Area")
-sheet_oi_single.range("A1").options(index=False).value = final_merged1
-wb.save()
+#sheet_oi_single = wb.sheets("Working_Area")
+#sheet_oi_single.range("A1").options(index=False).value = final_merged1
+#wb.save()
 
 ##
 # xw.Book(r"D:\Program\Data\NSE_Equity_Data.xlsm").sheets("Working_Area").range("A1").options(index=False).value =final_merged1

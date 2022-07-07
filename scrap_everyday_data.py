@@ -431,7 +431,6 @@ if __name__ == '__main__':
     empty_df = pd.DataFrame()
     dfi.export(empty_df, SS_DIR + "\\qtr_Header_tab_fii.png")
     dfi.export(empty_df, SS_DIR + "\\quaterly_Detail_tab_superstar.png")
-    exit()
     TODAY_DATE = TODAY_DATE.strftime('%d-%m-%Y')
     File = 'quaterly'
 
