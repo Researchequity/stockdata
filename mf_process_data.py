@@ -7,7 +7,7 @@ import re
 chayan_dir = r'\\192.168.41.190\chayan'
 today_date = datetime.date.today() - datetime.timedelta(days=29)
 today_date = today_date.strftime('_%m_%Y')
-
+#
 
 def mutual_fund():
     file = pd.read_excel(chayan_dir + '\\MF ROHAN\\Mutual_Fund' + today_date + '.xlsx',
