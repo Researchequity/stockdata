@@ -1,0 +1,1 @@
+/usr/local/bin/python3.7 /home/workspace/development/num_trades_10_30_100_500.cpython-37.pyc

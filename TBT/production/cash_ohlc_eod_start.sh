@@ -1,0 +1,1 @@
+/usr/local/bin/python3.7 /home/workspace/production/cash_ohlc_eod.cpython-37.pyc
