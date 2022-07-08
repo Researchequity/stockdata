@@ -63,6 +63,7 @@ def Analysis(df,filename):
     except:
         print("There is Something Wrong")
 
+
 def Cleaning(filename):
     try:
         df=pd.read_csv(RAW_DIR +'\\'+ str(filename))
@@ -96,6 +97,7 @@ def Cleaning(filename):
     except:
         print("There is Something Wrong with Cleaning Data")
 
+
 def NSECollectionOfDates(Date_format):
     try:
         All_date = []
@@ -117,6 +119,7 @@ def NSECollectionOfDates(Date_format):
         return All_date
     except:
         print("There is No Data Available for this Dates")
+
 
 def Daily_Snapshot_data():
     try:
@@ -140,6 +143,7 @@ def Daily_Snapshot_data():
                 print(f'Other error occurred: {err}')
     except:
         print("Something went wrong")
+
 
 def Commodities_Data():
     logging.basicConfig(level=logging.DEBUG)
@@ -209,6 +213,7 @@ def Commodities_Data():
         else:
             print("This Date Data are Already Exists")
 
+
 def Daily_Ind_Comm():
     df = pd.read_csv(PROCESSED_DIR + '\\' + 'Historical_Commodities_Data.csv')
     df['Date'] = pd.to_datetime(df['Date'], format='%d-%m-%Y')
@@ -250,7 +255,7 @@ def Daily_Ind_Comm():
     concat = concat.drop_duplicates()
     print(concat)
     # time.sleep(10)
-    concat.to_csv(r'\\192.168.41.190\kinjal' + '\\' + "daily_ind_comm.csv", index=False)
+    concat.to_csv(RAW_DIR + '\\' + "daily_ind_comm.csv", index=False)
 
 
 #try:

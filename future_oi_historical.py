@@ -14,7 +14,6 @@ from urllib.request import urlopen
 from email.utils import make_msgid
 from utils import *
 
-
 socket.setdefaulttimeout(5)
 file = os.path.basename(__file__)
 
@@ -82,7 +81,7 @@ def update_nse_fut_master_file(bhav_file_path, str_date):
 
     bhav_copy.drop(
         ['STRIKE_PR', 'OPTION_TYP', 'Unnamed: 15'],
-        axis=1, inplace=True)  # 'EXPIRY_DT',
+        axis=1, inplace=True)
 
     try:
         if not os.path.exists(PROCESSED_DIR + '\\' + bhav_data_nse_master_file):
@@ -129,10 +128,14 @@ def update_nse_opt_master_file(bhav_file_path, str_date):
             bhav_copy['TIMESTAMP'] = bhav_copy['TIMESTAMP'].dt.strftime('%d-%m-%Y')  # .apply(date_correction)
             bhav_copy.to_csv(PROCESSED_DIR + '\\option' + '\\' + bhav_data_nse_master_file, index=False)
         else:
-            bhav_data_nse_master_file_dataframe = pd.read_csv(PROCESSED_DIR + '\\option' + '\\' + bhav_data_nse_master_file)
-            bhav_data_nse_master_file_dataframe['TIMESTAMP'] = pd.to_datetime(bhav_data_nse_master_file_dataframe['TIMESTAMP'],format='%d-%m-%Y')
-            bhav_data_nse_master_file_dataframe['EXPIRY_DT'] = pd.to_datetime(bhav_data_nse_master_file_dataframe['EXPIRY_DT'], format='%d-%m-%Y')
-            if not (datetime.datetime.today().date() == pd.to_datetime(bhav_data_nse_master_file_dataframe['TIMESTAMP']).max().date()):
+            bhav_data_nse_master_file_dataframe = pd.read_csv(
+                PROCESSED_DIR + '\\option' + '\\' + bhav_data_nse_master_file)
+            bhav_data_nse_master_file_dataframe['TIMESTAMP'] = pd.to_datetime(
+                bhav_data_nse_master_file_dataframe['TIMESTAMP'], format='%d-%m-%Y')
+            bhav_data_nse_master_file_dataframe['EXPIRY_DT'] = pd.to_datetime(
+                bhav_data_nse_master_file_dataframe['EXPIRY_DT'], format='%d-%m-%Y')
+            if not (datetime.datetime.today().date() == pd.to_datetime(
+                    bhav_data_nse_master_file_dataframe['TIMESTAMP']).max().date()):
                 bhav_copy = pd.concat([bhav_copy, bhav_data_nse_master_file_dataframe])
                 bhav_copy['EXPIRY_DT'] = bhav_copy['EXPIRY_DT'].dt.strftime('%d-%m-%Y')
                 bhav_copy['TIMESTAMP'] = bhav_copy['TIMESTAMP'].dt.strftime('%d-%m-%Y')
@@ -188,7 +191,6 @@ def mwpl_cli_report():
     report_frame = report_frame[['Underlying Stock', 'SUM', 'AVG', 'COUNT', 'date']]
     report_frame = pd.DataFrame(report_frame)
 
-    # concate
     if report_frame.date.max() != result.date.max():
         result = pd.concat([report_frame, result])
         # result = pd.DataFrame(result)
@@ -236,19 +238,15 @@ def mwpl_cli_report():
     new_df.sort_values(by=['date'], ascending=False, inplace=True, axis=1)
     os.remove(RAW_DIR + '\\mwpl_cli_{}.xls'.format(str_date))
 
-    #   write data into excel
-    sheet_oi_single = wb.sheets('Today_yesterday')
-    sheet_oi_single.clear()
-    sheet_oi_single.range("A7").options(index=None).value = df_output
-    sheet_oi_single = wb.sheets('Historical_data')
-    sheet_oi_single.range("A7").options().value = new_df
-    wb.save()
+    df_output.to_csv(RAW_DIR+'//fut_Today_yesterday.csv', index=None)
+    new_df.to_csv(RAW_DIR + '//fut_Historical_data.csv')
 
 
 def get_opt_data():
     df = pd.read_csv(PROCESSED_DIR + '\\option' + '\\bhav_data_nse_opt_' + str_date + '.csv')
     df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'], format='%d-%m-%Y')
-    df_today = df.groupby(['TIMESTAMP', 'SYMBOL', 'OPTION_TYP']).agg({'OPEN_INT': ['sum'], 'CHG_IN_OI': ['sum']}).reset_index()
+    df_today = df.groupby(['TIMESTAMP', 'SYMBOL', 'OPTION_TYP']).agg(
+        {'OPEN_INT': ['sum'], 'CHG_IN_OI': ['sum']}).reset_index()
     df_today.columns = ['TIMESTAMP', 'SYMBOL', 'OPTION_TYP', 'OPEN_INT_sum', 'CHG_IN_OI_sum']
     df_today = pd.DataFrame(df_today)
 
@@ -309,7 +307,7 @@ def load_fut_dashboard():
     filt_date = datetime.date.today() - datetime.timedelta(days=180)
     filt_date = pd.to_datetime(filt_date, format='%Y-%m-%d')
     hist_data_grp_daily_df_csv['%chng'] = ((hist_data_grp_daily_df_csv['CHG_IN_OI_sum'] / \
-                                          hist_data_grp_daily_df_csv['OPEN_INT_sum']) * 100).round(2)
+                                            hist_data_grp_daily_df_csv['OPEN_INT_sum']) * 100).round(2)
     hist_data_grp_daily_df_csv = hist_data_grp_daily_df_csv[hist_data_grp_daily_df_csv.TIMESTAMP >= filt_date]
     hist_data_grp_daily_df_csv.sort_values(by=['SYMBOL', 'TIMESTAMP'], ascending=False, inplace=True)
 
@@ -331,17 +329,17 @@ def load_fut_dashboard():
 
     last_Week_df = df_today.loc[(df_today.TIMESTAMP <= last_week_date) & (df_today.TIMESTAMP >= last_month_date)]
     last_Week_price_df = df_today.loc[(df_today.TIMESTAMP == last_week_date)]
-    last_Week_price_df = last_Week_price_df[['SYMBOL','Close_first']]
+    last_Week_price_df = last_Week_price_df[['SYMBOL', 'Close_first']]
     last_Week_df = last_Week_df.groupby(['SYMBOL']).agg({'OPEN_INT_sum': ['mean']}).reset_index()
     last_Week_df.columns = ['SYMBOL', 'OPEN_INT_Mean']
-    last_Week_df = pd.merge(last_Week_df,last_Week_price_df, on=['SYMBOL'])
+    last_Week_df = pd.merge(last_Week_df, last_Week_price_df, on=['SYMBOL'])
     last_Week_df = pd.DataFrame(last_Week_df)
 
     last_full_Week_df = df_today.loc[(df_today.TIMESTAMP >= last_week_date)]
     last_full_Week_df = pd.DataFrame(last_full_Week_df)
     # last_full_Week_df.to_csv(r'\\192.168.41.190\program\stockdata\raw\asasa.csv')
     get_filt_data = last_full_Week_df[(last_full_Week_df['SYMBOL'] == 'NIFTY') | (
-                last_full_Week_df['SYMBOL'] == 'BANKNIFTY')]  # (last_full_Week_df['SYMBOL'] == 'FINNIFTY') |
+            last_full_Week_df['SYMBOL'] == 'BANKNIFTY')]  # (last_full_Week_df['SYMBOL'] == 'FINNIFTY') |
     get_filt_data = pd.DataFrame(get_filt_data)
 
     min_max_df = hist_data_grp_daily_df.groupby(['SYMBOL']).agg({'OPEN_INT_sum': ['max', 'mean', 'min']}).reset_index()
@@ -380,52 +378,16 @@ def load_fut_dashboard():
     pd.set_option("display.max_rows", None, "display.max_columns", None)
     min_expiry = pd.merge(min_expiry, option_data_df, on=['SYMBOL', 'TIMESTAMP'], how='left')
 
-    # Populate fut dashboard
-    sheet_oi_single = wb.sheets('Report_data')
-    sheet_oi_single.range("A1").options(index=None).value = min_expiry
-    sheet_oi_single = wb.sheets('AvgMinMaxOI')
-    sheet_oi_single.range("A1").options(index=None).value = min_max_df
-    sheet_oi_single = wb.sheets('Last_Week_OI')
-    sheet_oi_single.range("A1").options(index=None).value = last_Week_df
-    sheet_oi_single = wb.sheets('Today_OI')
-    sheet_oi_single.range("A1").options(index=None).value = yesterday_df
-    sheet_oi_single = wb.sheets('DailyAgg_OI')
-    sheet_oi_single.clear()
-    sheet_oi_single.range("A1").options(index=None).value = hist_data_grp_daily_df_csv  # df_today
+    min_expiry.to_csv(RAW_DIR + '//fut_Report_data.csv', index=None)
+    min_max_df.to_csv(RAW_DIR + '//fut_AvgMinMaxOI.csv', index=None)
+    last_Week_df.to_csv(RAW_DIR + '//fut_Last_Week_OI.csv', index=None)
+    yesterday_df.to_csv(RAW_DIR + '//fut_Today_OI.csv', index=None)
+    hist_data_grp_daily_df_csv.to_csv(RAW_DIR + '//fut_DailyAgg_OI.csv', index=None)
+    Mwpl_df.to_csv(RAW_DIR + '//fut_MWPL.csv', index=None)
+    get_filt_data.sort_values(['SYMBOL', 'TIMESTAMP']).to_csv(RAW_DIR + '//fut_Index.csv', index=None)
 
-    sheet_oi_single = wb.sheets('MWPL')
-    sheet_oi_single.range("A1").options(index=None).value = Mwpl_df
-    sheet_oi_single = wb.sheets('Index')
-    sheet_oi_single.range('A2:F40').clear()
-    sheet_oi_single.range("A1").options(index=None).value = get_filt_data.sort_values(['SYMBOL', 'TIMESTAMP'])
-    sheet_oi_single = wb.sheets('BN_Nifty_Major_opt')
-    sheet_oi_single.clear()
-    BN_Nifty_Major_opt = pd.read_csv(RAW_DIR + '\\BN_Nifty_Major_opt_tab.csv')
-    sheet_oi_single.range("A2").options(index=None).value = BN_Nifty_Major_opt
-    sheet_oi_single = wb.sheets('itm_opt')
-    sheet_oi_single.clear()
-    itm_opt = pd.read_csv(RAW_DIR + '\\itm_opt_tab.csv')
-    sheet_oi_single.range("A1").options(index=None).value = itm_opt
-
-    sheet_oi_single = wb.sheets('indx_comm')
-    sheet_oi_single.clear()
-    indx_comm = pd.read_csv(r'\\192.168.41.190\kinjal\daily_ind_comm.csv')
-
-    indx_comm['Date'] = pd.to_datetime(indx_comm['Date'], format='%d-%m-%Y')
-    indx_comm['Date'] = indx_comm['Date'].dt.strftime('%d-%m-%Y')
-
-    sheet_oi_single.range("A1").options(index=None).value = indx_comm
-
-    sheet_oi_single = wb.sheets('SGX')
-    sheet_oi_single.clear()
-    Agg_SGX = pd.read_csv(PROCESSED_DIR + '\\' + 'Agg_SGX_Nifty_Future.csv')
-    sheet_oi_single.range("A1").options(index=None).value = Agg_SGX
-
-    sheet_oi_single = wb.sheets('Foreign_data')
-    sheet_oi_single.clear()
-    foreign_data = pd.read_csv(r'\\192.168.41.190\chayan\Taiwan_korea\HistoricalTWDKRX.csv')
-    foreign_data.to_csv(PROCESSED_DIR + '\\HistoricalTWDKRX.csv', index=None)
-    sheet_oi_single.range("A1").options(index=None).value = foreign_data
+    hist_data_grp_daily_df_csv.to_csv(RAW_DIR + '//fut_DailyAgg_OI.csv', index=None)
+    hist_data_grp_daily_df_csv.to_csv(RAW_DIR + '//fut_DailyAgg_OI.csv', index=None)
 
 
 def change_oi_monthly():
@@ -469,14 +431,8 @@ def change_oi_monthly():
     sheet4['chng%'] = np.where(((sheet4[list[1]] != np.nan) & (sheet4[list[3]] != np.nan)),
                                round(((sheet4[list[1]] - sheet4[list[3]]) / sheet4[list[3]]) * 100), 0)
 
-    sheet_oi_single = wb.sheets('Change_OI_Monthly')
-    sheet_oi_single.clear()
-    sheet_oi_single.range("A1").options(index=None).value = sheet3
-
-    sheet_oi_single = wb.sheets('New_Change_OI_Monthly')
-    sheet_oi_single.clear()
-    sheet_oi_single.range("A1").options(index=None).value = sheet4
-    wb.save()
+    sheet3.to_csv(RAW_DIR+ '\\fut_Change_OI_Monthly.csv', index=None)
+    sheet4.to_csv(RAW_DIR + '\\fut_New_Change_OI_Monthly.csv', index=None)
 
 
 def get_fao_participant(Hist_date=None):
@@ -600,8 +556,8 @@ def get_fao_participant(Hist_date=None):
                          'Option_Stock_Put_FII', 'Option_Stock_Put_Pro', 'fii_long_pos'
                          ]]
 
-    sheet_oi_single = wb.sheets('Fii_Stats')
-    sheet_oi_single.range("A1").options(index=None).value = df_merge
+    df_merge.to_csv(RAW_DIR+'\\fut_Fii_Stats.csv', index=None)
+
     # unique dates
     date_unique = Historical['Date'].unique()
     unique_date_frame = pd.DataFrame(date_unique)
@@ -728,10 +684,7 @@ def get_fii_stats(Hist_date=None):
     temp.sort_values(by=['Date'], ascending=False, inplace=True)
     temp['Date'] = temp['Date'].dt.strftime('%d-%m-%Y')
 
-    # excel dump file
-    sheet_oi_single = wb.sheets('cdfp_value')
-    sheet_oi_single.range("L3").options(index=None).value = temp
-    wb.save()
+    temp.to_csv(RAW_DIR+ '\\fut_cdfp_value.csv', index=None)
 
 
 def screenshot():
@@ -745,6 +698,98 @@ def screenshot():
         xl.Application.Run("fut_OI_historical.xlsm!module1.historical_snap")
         xl.Application.Quit()
         del xl
+
+
+def load_csv_to_excel():
+    data_excel_file = REPORT_DIR + "\\fut_OI_historical.xlsm"
+    wb = xw.Book(data_excel_file)
+
+    fii_stats = pd.read_csv(RAW_DIR + '\\fut_Fii_Stats.csv')
+    sheet_oi_single = wb.sheets('Fii_Stats')
+    sheet_oi_single.range("A1").options(index=None).value = fii_stats
+
+    cdfp = pd.read_csv(RAW_DIR + '\\fut_cdfp_value.csv')
+    sheet_oi_single = wb.sheets('cdfp_value')
+    sheet_oi_single.range("L3").options(index=None).value = cdfp
+
+    oi_monthly = pd.read_csv(RAW_DIR + '\\fut_Change_OI_Monthly.csv')
+    sheet_oi_single = wb.sheets('Change_OI_Monthly')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A1").options(index=None).value = oi_monthly
+
+    new_oi_monthly = pd.read_csv(RAW_DIR + '\\fut_New_Change_OI_Monthly.csv')
+    sheet_oi_single = wb.sheets('New_Change_OI_Monthly')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A1").options(index=None).value = new_oi_monthly
+
+    Today_yesterday = pd.read_csv(RAW_DIR + '\\fut_Today_yesterday.csv')
+    sheet_oi_single = wb.sheets('Today_yesterday')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A7").options(index=None).value = Today_yesterday
+
+    Historical_data = pd.read_csv(RAW_DIR + '\\fut_Historical_data.csv')
+    sheet_oi_single = wb.sheets('Historical_data')
+    sheet_oi_single.range("A7").options().value = Historical_data
+
+    Report_data = pd.read_csv(RAW_DIR + '\\fut_Report_data.csv')
+    sheet_oi_single = wb.sheets('Report_data')
+    sheet_oi_single.range("A1").options(index=None).value = Report_data
+
+    AvgMinMaxOI = pd.read_csv(RAW_DIR + '\\fut_AvgMinMaxOI.csv')
+    sheet_oi_single = wb.sheets('AvgMinMaxOI')
+    sheet_oi_single.range("A1").options(index=None).value = AvgMinMaxOI
+
+    Last_Week_OI = pd.read_csv(RAW_DIR + '\\fut_Last_Week_OI.csv')
+    sheet_oi_single = wb.sheets('Last_Week_OI')
+    sheet_oi_single.range("A1").options(index=None).value = Last_Week_OI
+
+    Today_OI = pd.read_csv(RAW_DIR + '\\fut_Today_OI.csv')
+    sheet_oi_single = wb.sheets('Today_OI')
+    sheet_oi_single.range("A1").options(index=None).value = Today_OI
+
+    DailyAgg_OI = pd.read_csv(RAW_DIR + '\\fut_DailyAgg_OI.csv')
+    sheet_oi_single = wb.sheets('DailyAgg_OI')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A1").options(index=None).value = DailyAgg_OI  # df_today
+
+    MWPL = pd.read_csv(RAW_DIR + '\\fut_MWPL.csv')
+    sheet_oi_single = wb.sheets('MWPL')
+    sheet_oi_single.range("A1").options(index=None).value = MWPL
+
+    fut_Index = pd.read_csv(RAW_DIR + '\\fut_Index.csv')
+    sheet_oi_single = wb.sheets('Index')
+    sheet_oi_single.range('A2:F40').clear()
+    sheet_oi_single.range("A1").options(index=None).value = fut_Index.sort_values(['SYMBOL', 'TIMESTAMP'])
+
+    sheet_oi_single = wb.sheets('BN_Nifty_Major_opt')
+    sheet_oi_single.clear()
+    BN_Nifty_Major_opt = pd.read_csv(RAW_DIR + '\\BN_Nifty_Major_opt_tab.csv')
+    sheet_oi_single.range("A2").options(index=None).value = BN_Nifty_Major_opt
+
+
+    sheet_oi_single = wb.sheets('itm_opt')
+    sheet_oi_single.clear()
+    itm_opt = pd.read_csv(RAW_DIR + '\\itm_opt_tab.csv')
+    sheet_oi_single.range("A1").options(index=None).value = itm_opt
+
+    sheet_oi_single = wb.sheets('indx_comm')
+    sheet_oi_single.clear()
+    indx_comm = pd.read_csv(RAW_DIR + '\\daily_ind_comm.csv')
+    indx_comm['Date'] = pd.to_datetime(indx_comm['Date'], format='%d-%m-%Y')
+    indx_comm['Date'] = indx_comm['Date'].dt.strftime('%d-%m-%Y')
+    sheet_oi_single.range("A1").options(index=None).value = indx_comm
+
+    sheet_oi_single = wb.sheets('SGX')
+    sheet_oi_single.clear()
+    Agg_SGX = pd.read_csv(PROCESSED_DIR + '\\' + 'Agg_SGX_Nifty_Future.csv')
+    sheet_oi_single.range("A1").options(index=None).value = Agg_SGX
+
+    sheet_oi_single = wb.sheets('Foreign_data')
+    sheet_oi_single.clear()
+    foreign_data = pd.read_csv(r'\\192.168.41.190\chayan\Taiwan_korea\HistoricalTWDKRX.csv')
+    foreign_data.to_csv(PROCESSED_DIR + '\\HistoricalTWDKRX.csv', index=None)
+    sheet_oi_single.range("A1").options(index=None).value = foreign_data
+    wb.save()
 
 
 def sendmail():
@@ -1042,7 +1087,10 @@ def call_function():
 
             get_fii_stats()
             print('get_fii_stats')
-            
+
+            load_csv_to_excel()
+            print('loading_excel_complete')
+
             screenshot()
             print('screenshot')
             try:
@@ -1064,7 +1112,4 @@ def call_function():
 if __name__ == '__main__':
     import get_api_nse_fno_eod
     print('Options data')
-    data_excel_file = REPORT_DIR + "\\fut_OI_historical.xlsm"
-    wb = xw.Book(data_excel_file)
     call_function()
-    wb.close()
