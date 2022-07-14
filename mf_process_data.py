@@ -5,9 +5,10 @@ import xlwings as xw
 import re
 
 chayan_dir = r'\\192.168.41.190\chayan'
+REPORT_DIR = r'\\192.168.41.190\report'
 today_date = datetime.date.today() - datetime.timedelta(days=29)
 today_date = today_date.strftime('_%m_%Y')
-#
+
 
 def mutual_fund():
     file = pd.read_excel(chayan_dir + '\\MF ROHAN\\Mutual_Fund' + today_date + '.xlsx',
@@ -30,8 +31,6 @@ def mutual_fund():
     # final_df = final_df[final_df['No. of Shares_prev'] != 0]
 
     # calculative part
-    final_df['% of Total Holding'] = (final_df['Market Value (Cr.)_current'] / final_df[
-        'Company s Mkt Cap (Cr.)']) * 100
     final_df['Month Change in Shares%'] = ((final_df['No. of Shares_current'] - final_df['No. of Shares_prev']) * 100) / \
                                           final_df['No. of Shares_prev']
     final_df['Month Change in Shares%'] = final_df['Month Change in Shares%'].astype(str).replace('inf', 100)
@@ -48,6 +47,7 @@ def mutual_fund():
         , "MarketCap": "CAP"})
     df_merge = df_merge.fillna(0)
     df_merge['issued_shares'] = df_merge['issued_shares'].replace('-', 0).astype(float)
+    df_merge['% of Total Holding'] = (df_merge['Quantity'] / df_merge['issued_shares']) * 100
     df_merge['% of Total Holding_prev'] = (df_merge['No. of Shares_prev'] / df_merge['issued_shares']) * 100
     df_merge['change in % of equity'] = df_merge['% of Total Holding'] - df_merge['% of Total Holding_prev']
 
@@ -62,12 +62,20 @@ def mutual_fund():
          "Month Change", "Change in value $", "Fund_Name", "CAP", "ISIN", "NSE Symbol", "BSE Code", "AMC Name",
          "Company s Mkt Cap (Cr.)", "Market Value (Cr.)_prev", "No. of Shares_prev", "issued_shares",
          "% of Total Holding_prev", "change in % of equity", "prev_hold_val_today", "chng_val_asof_current_price"]]
-    df_merge.to_csv(chayan_dir + '\\MF ROHAN\\Mutual_Fund' + today_date + '_processed.csv', index=None)
+    df_merge.to_csv(REPORT_DIR + '\\MF FINAL\\Mutual_Fund' + today_date + '_processed.csv', index=None)
+
+    file = REPORT_DIR + "\\MF FINAL\\Analysis_Mutual_Fund_Template.xlsx"
+    wb = xw.Book(file)
+    sheet_oi_single = wb.sheets('Aditya_Birla_Sun_Life_Small_Cap')
+    sheet_oi_single.clear()
+    sheet_oi_single.range("A1").options(index=None).value = df_merge
     ic(df_merge.head(5))
+    wb.save()
+    wb.close()
 
 
 def mutual_fund_analysis():
-    file = r"\\192.168.41.190\chayan\MF FINAL\Analysis_Mutual_Fund" + today_date + ".xlsx"
+    file = REPORT_DIR + "\\MF FINAL\\Analysis_Mutual_Fund_Template.xlsx"
     sheet = pd.read_excel(file, sheet_name='Aditya_Birla_Sun_Life_Small_Cap')
 
     # FINAL TASK 1
@@ -89,6 +97,8 @@ def mutual_fund_analysis():
     group = group[['ISIN', 'Invested In', 'Sum of Quantity', 'Sum of Month Change', 'Sum of % Total Holding', 'change']]
 
     # FINAL TASK 2
+    sheet['chng_val_asof_current_price'] = round(sheet['chng_val_asof_current_price'])
+    sheet = sheet[(sheet['chng_val_asof_current_price']>0.5) | (sheet['chng_val_asof_current_price']<-0.5)]
     sheet2 = sheet[['CAP', 'AMC Name', 'Invested In', 'chng_val_asof_current_price']]
     CapPattern = re.compile('Small|Mid')
     AMCPattern = re.compile('HDFC MF|DSP MF|Mirae MF|PGIM India MF|PPFAS MF|Quant MF')
@@ -106,16 +116,16 @@ def mutual_fund_analysis():
     for j in range(0, len(Slice)):
         x = Slice.loc[j].count()
         if (x >= 2):
-            arr.append(j)
+            arr.append(round(j))
     Output = pivot.loc[arr]
 
     wb = xw.Book(file)
     sheet_oi_single = wb.sheets['Val_chng_Stock_perct']
     sheet_oi_single.clear()
     sheet_oi_single.range('A1').options(index=False).value = group
-    sheet_oi_single = wb.sheets['Val_chng_Stock_perct_amc']
-    sheet_oi_single.clear()
-    sheet_oi_single.range('A1').options(index=False).value = pivot
+    # sheet_oi_single = wb.sheets['Val_chng_Stock_perct_amc']
+    # sheet_oi_single.clear()
+    # sheet_oi_single.range('A1').options(index=False).value = pivot
     sheet_oi_single = wb.sheets['Val_chng_Stock_more_than_2_val']
     sheet_oi_single.clear()
     sheet_oi_single.range('A1').options(index=False).value = Output
@@ -124,5 +134,5 @@ def mutual_fund_analysis():
 
 
 if __name__ == '__main__':
-    mutual_fund()
+    #mutual_fund()
     mutual_fund_analysis()
