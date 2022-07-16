@@ -134,5 +134,5 @@ def mutual_fund_analysis():
 
 
 if __name__ == '__main__':
-    #mutual_fund()
+    mutual_fund()
     mutual_fund_analysis()

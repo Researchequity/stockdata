@@ -62,8 +62,8 @@ def return_result_by_odr_T(df_stream,token):
     #import pdb;pdb.set_trace() 
     filtered_df_stream = df_stream[df_stream[1] == 'T']
     filtered_df_stream[9]=filtered_df_stream[5]*filtered_df_stream[6]
-    frame = filtered_df_stream.groupby([7,4]).agg({0:['count'],6:['sum'],9: ['sum'],5:['first','max','min','last']}).reset_index()
-    frame.columns = ['Date','token','row_count', 'sum_qty','9_sum','open','high','low','close']
+    frame = filtered_df_stream.groupby([7,4]).agg({0:['count'],6:['sum'],9: ['sum']}).reset_index()
+    frame.columns = ['Date','token','row_count', 'sum_qty','9_sum']
     frame['vwap_price']= frame['9_sum']//frame['sum_qty']
     frame['token']=frame['token'].astype(int)
     result=pd.merge(frame,token,on='token')
@@ -101,9 +101,6 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
     header = True
 
     read_row = 0
-    open_price_read = 0
-    onetime = 0
-    
     if os.path.exists(skip_row_path):
         read_row = pd.read_csv(skip_row_path)['read_row']
         read_row = int(read_row[0])
@@ -113,10 +110,8 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
         last_min_df=pd.read_csv(LAST_MIN_DATA_FILE)
     else:
         last_min_df=pd.DataFrame()
-    
-    while datetime.now() <= datetime(year=datetime.today().year, day=datetime.today().day, month=datetime.today().month, hour=15, minute=35, second=00) or onetime == 0:
-        onetime =1
 
+    while datetime.now() <= datetime(year=datetime.today().year, day=datetime.today().day, month=datetime.today().month, hour=23, minute=59, second=00):
         #import pdb;pdb.set_trace()
 
         #if not header:
@@ -125,7 +120,7 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
             read_row = int(read_row[0])
         try:
 
-            chunk = pd.read_csv(dumper_file,header=None,chunksize=100000,skiprows=read_row)
+            chunk = pd.read_csv(dumper_file,header=None,chunksize=1000000,skiprows=read_row)
             
 
             for df_stream in chunk:
@@ -138,7 +133,7 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
 
                 last_min = pd.to_datetime(df_stream[7].max())
                 
-                
+            
 
                 if len(df_stream):
 
@@ -159,7 +154,7 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
                     pd.DataFrame([{'read_row': read_row}]).to_csv(skip_row_path, index=False)
                     
                     if len(last_min_df):
-                        df_5= pd.concat([last_min_df,df_5])
+                        df_5= pd.concat([df_5,last_min_df])
                         last_min_df=pd.DataFrame()
                         
 
@@ -168,50 +163,25 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
                     TODAY_DAY= last_min.day
                     TODAY_MONTH= last_min.month
                     TODAY_YEAR= last_min.year
-                    
-                    if datetime.now() <= datetime(year=datetime.today().year, day=datetime.today().day, month=datetime.today().month, hour=9, minute=20, second=00) or open_price_read == 0:
-                        open_df = pd.read_csv(OPENING_DATA_FILE,header=None)
-                        
-                        open_df.columns = ['token','vwap_price'] # called vwap_price but its actually an open price
+                    today_09_15 = datetime(day=TODAY_DAY,month=TODAY_MONTH,year=TODAY_YEAR,hour=9,minute=15,second=0)
+                    open_df = df_5[(df_5['Date'] == today_09_15 )]
 
-                        open_price_read = 1
-                    #today_09_25 = datetime(day=TODAY_DAY,month=TODAY_MONTH,year=TODAY_YEAR,hour=9,minute=25,second=0)
-                    #open_df = df_5[(df_5['Date'] == today_09_15 )]
-                    #open_df[['token','vwap_price']].to_csv(OPENING_DATA_FILE,mode='a',header=None,index=False)
+                    open_df[['token','vwap_price']].to_csv(OPENING_DATA_FILE,mode='a',header=None,index=False)
                     
                     if len(last_min_df):
                         last_min_df.to_csv(LAST_MIN_DATA_FILE)
 
                     df_5=df_5[(df_5['Date'] < last_min)]
-                    
 
                     if len(df_5): 
 
+
                         df_5['vwap_price'] = df_5['vwap_price'].astype(int)
-                        df_5_groupby = df_5.groupby(['Date', 'token', 'Symbol'])
-                        df_ohlc = df_5_groupby.agg({'open': ['first'],'high':['max'],'low':['min'],'close':['last'],'9_sum': ['sum'], 'sum_qty': ['sum']}).reset_index()
-                        df_ohlc.columns = ['Date', 'token','Symbol', 'open', 'high', 'low', 'close','value','volume']
-                        df_ohlc['Date'] = df_ohlc['Date'] + pd.offsets.Minute(1)
-                        df_ohlc[['Date', 'token', 'open', 'high', 'low', 'close','value','volume']].to_csv(os.path.join(TRADE_WATCH,"ohlc_{}.csv".format(DATE_TODAY)),mode='a',index=False, header=False)
+                        df_5_groupby = df_5.groupby(['Date', 'token', 'Symbol']).agg({'row_count': ['sum'], 'sum_qty': ['sum'], 'nbuy_count': ['sum'],'nsell_count':
+['sum'],'vwap_price':['mean'], 'nbuy_qty': ['sum'], 'nsell_qty': ['sum'] })
 
-                        # # Get Vwap
-                        # ohlc_df = pd.read_csv(os.path.join(TRADE_WATCH,"ohlc_{}.csv".format(DATE_TODAY)), header=None)[[0,1,2,3,4,5,6,7]]
-                        # ohlc_df.columns = ['date', 'token', 'open', 'high', 'low', 'close', 'value', 'volume']
-                        # #ohlc_df['date'] = pd.to_datetime(ohlc_df['date'])
-                        # #ohlc_df = ohlc_df.sort_values(['date']).reset_index(drop=True)
-                        # ohlc_df['value_cumsum'] = ohlc_df.groupby(['token'])['value'].cumsum(axis=0)
-                        # ohlc_df['volume_cumsum'] = ohlc_df.groupby(['token'])['volume'].cumsum(axis=0)
-                        # ohlc_df['vwap'] = ohlc_df['value_cumsum'] // ohlc_df['volume_cumsum']
-                        # ohlc_df.drop(['value_cumsum', 'volume_cumsum'], axis=1, inplace=True)
-                        # ohlc_df[['date', 'token', 'open', 'high', 'low', 'close', 'value', 'volume','vwap']].to_csv(
-                        #     os.path.join(TRADE_WATCH, "ohlc_{}.csv".format(DATE_TODAY)), index=False, header=False)
-
-
-                        df_5_groupby = df_5_groupby.agg({'row_count': ['sum'], 'sum_qty': ['sum'], 'nbuy_count': ['sum'],'nsell_count':['sum'],'vwap_price':['mean'], 'nbuy_qty': ['sum'], 'nsell_qty': ['sum']})
-                        
 
                         df_5_groupby.reset_index(inplace=True)
-                        
                         df_5_groupby.columns = ["".join(x) for x in df_5_groupby.columns.ravel()]
                         df_5_groupby.rename(columns={"row_countsum":"row_count","sum_qtysum":"sum_qty","nbuy_countsum":"nbuy_count","nsell_countsum":"nsell_count","vwap_pricemean":"vwap_price","nbuy_qtysum":"nbuy_qty","nsell_qtysum":"nsell_qty"}, inplace = True)
                         df_5_groupby['vwap_price'] = df_5_groupby['vwap_price'].astype(int)
@@ -219,13 +189,15 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
                         df_5_groupby.to_csv(resulting_filepath, mode='a', index=False, header=False) # keep same
 
 
+                        
+
                         try:
                             df_norman_trd.rename(columns={'Stock': 'Symbol'}, inplace=True)
 
                             df_6 = pd.merge(df_5_groupby, df_norman_trd, on='Symbol')
                             df_6 = df_6[["Date", "token", "Symbol","row_count","sum_qty","nbuy_count","nsell_count","vwap_price","normean_quantity","normean_trd","nbuy_qty","nsell_qty"]]
 
-                            df_6 = df_6[((df_6['sum_qty'] >= 10*df_6['normean_quantity']) & (df_6['row_count'] >= 100))] #| (df_6['sum_qty'] >= 50*df_6['normean_quantity'])
+                            df_6 = df_6[((df_6['sum_qty'] >= 10*df_6['normean_quantity']) & (df_6['normean_trd'] >10)) | (df_6['sum_qty'] >= 100*df_6['normean_quantity'])]
 
 
                             df_6.to_csv(os.path.join(TRADE_WATCH,"trade_result_final_{}.csv".format(DATE_TODAY)),mode='a',index=False, header=False)
@@ -264,7 +236,7 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
                             #df_6.to_csv(os.path.join(TRADE_WATCH,"df7_{}.csv".format(DATE_TODAY)),index=False, header=False)
                             
                             #check num of traded in X min should be 30 , and
-                            df_6 = df_6[(df_6['repeat'] >= 0) & (df_6['row_count'] >= 100) & (df_6['vwap_price'] > df_6['o_price']) ] #& (df_6['normean_trd'] >10)
+                            df_6 = df_6[(df_6['repeat'] >= 0) & (df_6['row_count'] >= 20) & (df_6['vwap_price'] > df_6['o_price']) & (df_6['normean_trd'] >10)] 
                             
                             if len(df_6):
                                 #wb.sheets("Current").range("A1").options(index=False).value = df_6
@@ -293,14 +265,7 @@ def start_thread(df_norman_trd,interval, token,dumper_file,LOG_FILE_NAME):
             if last_min == datetime(year=datetime.today().year, day=datetime.today().day, month=datetime.today().month, hour=15, minute=29, second=00) and datetime.now() >= datetime(year=datetime.today().year, day=datetime.today().day, month=datetime.today().month, hour=15, minute=31, second=00):
                 df_5= last_min_df
                 df_5['vwap_price'] = df_5['vwap_price'].astype(int)
-                df_5_groupby = df_5.groupby(['Date', 'token', 'Symbol'])
-
-                df_ohlc = df_5_groupby.agg({'open': ['first'],'high':['max'],'low':['min'],'close':['last'],'9_sum': ['sum'], 'sum_qty': ['sum']}).reset_index()
-                df_ohlc.columns = ['Date', 'token','Symbol', 'open', 'high', 'low', 'close','value','volume']
-                df_ohlc['Date'] = df_ohlc['Date'] + pd.offsets.Minute(1)
-                df_ohlc[['Date', 'token', 'open', 'high', 'low', 'close','value','volume']].to_csv(os.path.join(TRADE_WATCH,"ohlc_{}.csv".format(DATE_TODAY)),mode='a',index=False, header=False)
-
-                df_5_groupby = df_5_groupby.agg({'row_count': ['sum'], 'sum_qty': ['sum'], 'nbuy_count': ['sum'],'nsell_count':['sum'],'vwap_price':['mean'], 'nbuy_qty': ['sum'], 'nsell_qty': ['sum']})
+                df_5_groupby = df_5.groupby(['Date', 'token', 'Symbol']).agg({'row_count': ['sum'], 'sum_qty': ['sum'], 'nbuy_count': ['sum'],'nsell_count':['sum'],'vwap_price':['mean'], 'nbuy_qty': ['sum'], 'nsell_qty': ['sum'] })
                 df_5_groupby.reset_index(inplace=True)
                 df_5_groupby.columns = ["".join(x) for x in df_5_groupby.columns.ravel()]
                 df_5_groupby.rename(columns={"row_countsum":"row_count","sum_qtysum":"sum_qty","nbuy_countsum":"nbuy_count","nsell_countsum":"nsell_count","vwap_pricemean":"vwap_price","nbuy_qtysum":"nbuy_qty","nsell_qtysum":"nsell_qty"}, inplace = True)
@@ -324,8 +289,8 @@ def filtering_stream_data():
         division_factor= 75 if int(interval)==5 else 375
 
         df_norman_trd=pd.read_csv(NORMEN_TRD_FILE)
-        df_norman_trd['normean_quantity']=df_norman_trd['vol_norm_mean'].apply(lambda x: (x//division_factor)) #mean_quantity
-        df_norman_trd['normean_trd']=df_norman_trd['trd_norm_mean'].apply(lambda x: (x//division_factor))
+        df_norman_trd['normean_quantity']=df_norman_trd['mean_quantity'].apply(lambda x: (x//division_factor))
+        df_norman_trd['normean_trd']=df_norman_trd['mean_trd'].apply(lambda x: (x//division_factor))
         df_norman_trd = df_norman_trd[['Stock','normean_quantity','normean_trd']]
                 
         token = pd.read_csv(TOKEN_SECURITY_FILE)
@@ -350,7 +315,6 @@ def filtering_stream_data():
 LOG_FILE_NAME=str(str(os.path.abspath(__file__)).split('/')[-1]).split('.')[0]+".log"
 #LOG_FILE_NAME=str(str(os.path.abspath(__file__)).split('/')[-1]).split('.')[0]+".log"
 DATE_TODAY = ''.join(str(datetime.today().date()).split('-'))
-#DATE_TODAY = '20210330'
 TODAY_DAY= datetime.today().day
 TODAY_MONTH= datetime.today().month
 TODAY_YEAR= datetime.today().year

@@ -65,39 +65,31 @@ def del_last_day_file(i):
         return None
 
 def download_stream(index,input_path,inc_file_path,last_row_file_path,break_time,clean_file_path):
-    
-    print(last_row_file_path)
-    
+    print(input_path)
     read_row = 0
-    onetime = 0
-    while datetime.now()<=break_time or onetime == 0: # loop will break when time at server exceed 3:31:00 (10:01:00 at server) PM
-        onetime = 1
+    while datetime.now()<=break_time: # loop will break when time at server exceed 3:31:00 (10:01:00 at server) PM
         try:
+            if os.path.exists(inc_file_path):
+                os.system("rm -f {}".format(inc_file_path))
 
-            if os.path.exists(last_row_file_path):
-                read_row = pd.read_csv(last_row_file_path)['read_row']
-                read_row = int(read_row[0])
+
+            #os.system('end_var=0 ; [ -f {} ] && end_var=$(awk -F, \'{}\' {}) ; start_var=$end_var ; tail -1 {} > {} ; end_var=$(awk -F, \'{}\' {}) ; awk -F, -v a="$start_var" -v b="$end_var" \'{}\' {} > {}'.format(last_row_file_path, "{print$1}", last_row_file_path,input_path,last_row_file_path,"{print$1}",last_row_file_path,"{if($1>a && $1<=b)print$0}",input_path,inc_file_path))
 
             chunk = pd.read_csv(input_path , header  = None, chunksize=50000,skiprows=read_row) #nrows=100000)
 
             for df_stream_token in chunk:
                 read_row=read_row+len(df_stream_token)
-                
                 # drop columns not needed
                 df_stream_token['datetime'] = pd.to_datetime('1980-01-01 00:00:00') + pd.to_timedelta(df_stream_token[6]).dt.floor("S")
                 df_stream_token = df_stream_token.drop([0, 1, 2, 3,6], axis=1)
                 df_stream_token = df_stream_token[df_stream_token[5]!="M"]
                 df_stream_token.to_csv(clean_file_path , index=False, mode='a', header=False)
-                
-                pd.DataFrame([{'read_row': read_row}]).to_csv(last_row_file_path, index=False)
-                print(read_row)
-
 
 
         except Exception as e:
             # if there is no file at server or any other issue
             LOG_insert("/home/workspace/dumper/file.log", formatLOG, e, logging.INFO)
-            #logging.info(str(e))
+            logging.info(str(e))
 
 
 
@@ -116,7 +108,6 @@ def start_stream_download():
             i = j + 1
             date = ''.join(str(datetime.today().date()).split('-'))
             files = glob(os.path.join(input_file_path_cash.format(i), 'DUMP_{}*.DAT'.format(date)))
-            print(files)
 
             for input_file in files:
                 break_time=datetime(year=datetime.today().year,day=datetime.today().day,month=datetime.today().month,hour=15,minute=35,second=00)

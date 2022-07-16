@@ -1,6 +1,4 @@
 import pandas as pd
-import datetime
-
 
 filepath = "/home/dwh/contract_files/"
 sec_filepath = filepath + "security.txt"
@@ -20,7 +18,7 @@ con_df = pd.read_csv(contract_filepath, sep='|',header=None,skiprows = 1)
 con_df = con_df[(con_df[2] =='FUTSTK')|(con_df[2] =='FUTIDX')]
 con_df = con_df[[0,2,3,30,53,8]]
 con_df.columns = ['token', 'Series','Symbol','lotsize','companyName','Option']
-#con_df = con_df[con_df['companyName'].str[-6:] =='APRFUT']
+con_df = con_df[con_df['companyName'].str[-6:] =='MARFUT']
 con_df[['token', 'Series','Symbol','lotsize','companyName','Option']].to_csv("/home/workspace/production/python_ankit/token_contract.csv",index=False)
 
 
