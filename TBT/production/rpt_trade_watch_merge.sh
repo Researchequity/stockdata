@@ -1,0 +1,1 @@
+/usr/local/bin/python3.7 /home/workspace/production/rpt_trade_watch_merge.cpython-37.pyc

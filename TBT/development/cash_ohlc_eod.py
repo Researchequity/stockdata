@@ -3,7 +3,7 @@ from datetime import datetime
 
 path= '/home/workspace/aggregate/'
 
-#Change date for file read  and comment date from today 
+#Change date for file read  and comment date from today
 date = '20210409'
 date = ''.join(str(datetime.today().date()).split('-'))
 
@@ -38,5 +38,3 @@ df_ohlc_eod[['token','open','high','low','close','value','volume']].to_csv(path 
 df_ohlc_eod['pp'] = (df_ohlc_eod['high'] +df_ohlc_eod['low'] + df_ohlc_eod['close'])//3
 df_ohlc_eod['R3'] = df_ohlc_eod['high'] + 2 *(df_ohlc_eod['pp'] - df_ohlc_eod['low'])
 df_ohlc_eod[['token','open','high','low','close','value','volume','R3']].to_csv(path +'ohlcdaily.csv',index=False)
-
-

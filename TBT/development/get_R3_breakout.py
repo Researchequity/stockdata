@@ -14,8 +14,9 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.width', None)
 
 #Change date for file read  and comment date from today
-date = '20210409'
+date = '20210806'
 date = ''.join(str(datetime.today().date()).split('-'))
+
 print(date)
 
 read_row = 0

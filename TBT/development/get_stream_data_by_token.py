@@ -8,9 +8,9 @@ from get_stream_data_by_token_filepath import *
 
 #Input from Excel
 if getpass.getuser() == 'ankit':
-    data_excel_file = python_ankit_dir  + "\\Stream_ankit.xlsm"
-if getpass.getuser() == 'VIJITR':
-    data_excel_file = python_ankit_dir  + "\\Stream.xlsm"
+    data_excel_file = "E:\\program\\Stream_ankit.xlsm"
+if getpass.getuser() == 'vijitr':
+    data_excel_file = "E:\\program\\Stream.xlsm"
 
 wb = xw.Book(data_excel_file)
 
@@ -102,7 +102,6 @@ df_stream_token_new_groupby_buy = df_stream_token_new.groupby(['buyOrder'])
 df_stream_token_new_buy_count = df_stream_token_new_groupby_buy[['orderType']].count()
 df_stream_token_new_groupby_buy = []
 df_stream_token_new_buy_count.rename(columns={"orderType": "count"}, inplace=True)
-
 df_stream_token_new_dup = df_stream_token_new_buy_count[df_stream_token_new_buy_count['count'] > 1]
 df_stream_token_new_dup = df_stream_token_new_dup.reset_index()
 
@@ -115,9 +114,7 @@ df_stream_token.drop(df_stream_token[cond].index, inplace=True)
 
 df_stream_token_cancelled = df_stream_token[df_stream_token['orderType'] == "X"]
 
-df_cancelled_new_missing = df_stream_token_cancelled[
-    ~df_stream_token_cancelled['buyOrder'].isin(df_stream_token_new['buyOrder'])]
-
+df_cancelled_new_missing = df_stream_token_cancelled[~df_stream_token_cancelled['buyOrder'].isin(df_stream_token_new['buyOrder'])]
 df_cancelled_new_missing["orderType"].replace({"X": "N"}, inplace=True)
 
 df_missing = pd.concat([df_buy_new_missing, df_sell_new_missing])
@@ -296,13 +293,20 @@ df_live_stream = df_live_stream.drop(columns='buyOrder1')
 df_live_stream = df_live_stream.drop(columns='uniqueRow')
 df_stream_token_traded = df_stream_token_traded.drop(columns='uniqueRow')
 df_live_stream_error = df_live_stream_error.drop(columns='uniqueRow')
-
+sl_df = pd.read_csv(r'Y:\aggregate\sl\scan\sl_' + str(datetime.now().strftime("%Y%m%d")) + '_07300' + str(stream) + '.csv', header=None)
+sl_df = sl_df.groupby([3, 2])[5].first().reset_index()
+sl_df = sl_df.rename(columns={3: 'token', 2: 'order_id', 5: 'price_first'})
+sl_df['token'] = sl_df['token'].astype(str)
+sl_df['order_id'] = sl_df['order_id'].astype(str)
+df_live_stream_error = pd.merge(df_live_stream_error, sl_df, how='left', left_on=['sellOrder', 'buyOrder'], right_on=['token', 'order_id'])
 # #### saving the outputs to excel sheet
 try:
     wb.sheets("SL").range("A1").options(index=False).value = df_live_stream_error[df_live_stream_error['datetime'].dt.strftime('%H:%M') > "09:14"]
     wb.sheets("Traded").range("A1").options(index=False).value = df_stream_token_traded
     wb.sheets("All_trades").range("A1").options(index=False).value = df_live_stream
     wb.sheets("Num_trades").range("A1").options().value = df_final
+    cumilative = pd.read_csv(r'Y:\aggregate\report\cumilative.csv')
+    wb.sheets("analysis").range("B1").options(index=False).value = cumilative
 
     # wb.sheets("Df_live").range("A1").options(index=False).value = df_live
 except ValueError as V:

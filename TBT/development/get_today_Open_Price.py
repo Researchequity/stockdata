@@ -55,7 +55,6 @@ while datetime.now() <= datetime(year=datetime.today().year, day=datetime.today(
     df3 = df3[df3[7] <= temp_date]
     df4 = df4[df4[7] <= temp_date]
 
-
     df = pd.concat([df1, df2])
     df = pd.concat([df, df3])
     df = pd.concat([df, df4])
@@ -73,7 +72,6 @@ while datetime.now() <= datetime(year=datetime.today().year, day=datetime.today(
 
     open_df = open_df[['4_x',5]]
     open_df.columns = ['token','open_price']
-    #print(open_df)
     open_df.to_csv(OPENING_DATA_FILE, header = None, index=False)
 
 
