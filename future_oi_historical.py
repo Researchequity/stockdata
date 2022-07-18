@@ -20,7 +20,7 @@ file = os.path.basename(__file__)
 LOG_FILE_NAME = str(LOG_DIR) + "\\get_BHAV_FILE_NSE_FUT_Historical.log"
 
 global fii_stats_date, str_date
-date_today = datetime.date.today() #- datetime.timedelta(days=1)
+date_today = datetime.date.today() #- datetime.timedelta(days=3)
 date, prev_date, fut_date = get_market_prev_date_fut_date(date_today)
 
 prev_date = prev_date.strftime('%d%m%Y')
@@ -793,6 +793,11 @@ def load_csv_to_excel():
     foreign_data = pd.read_csv(r'\\192.168.41.190\chayan\Taiwan_korea\HistoricalTWDKRX.csv')
     foreign_data.to_csv(PROCESSED_DIR + '\\HistoricalTWDKRX.csv', index=None)
     sheet_oi_single.range("A1").options(index=None).value = foreign_data
+
+    sheet_oi_single = wb.sheets('Index_monthly')
+    sheet_oi_single.clear()
+    Nifty_monthly = pd.read_csv(r'\\192.168.41.190\program\stockdata\raw\fut_BN_Nifty_Major_monthly_exp.csv')
+    sheet_oi_single.range("A1").options(index=None).value = Nifty_monthly
     wb.save()
 
 

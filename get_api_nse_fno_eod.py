@@ -25,9 +25,15 @@ all_stock_df = []
 index_expiry = pd.DataFrame()
 
 
+def last_day_of_month(any_day):
+    # The day 28 exists in every month. 4 days later, it's always next month
+    next_month = any_day.replace(day=28) + datetime.timedelta(days=4)
+    # subtracting the number of the current day brings us back one month
+    return next_month - datetime.timedelta(days=next_month.day)
+
+
 def start_thread(StockSymbol,index,s):
     try:
-        print(StockSymbol)
         url = 'https://www.nseindia.com/api/quote-derivative?symbol=' + StockSymbol.replace('&', '%26')
         r = s.get(url, headers=headers).json()
 
@@ -92,21 +98,26 @@ def start_thread(StockSymbol,index,s):
             EXP_unique[0] = pd.to_datetime(EXP_unique[0])
             EXP_unique.sort_values(by=0, ascending=False, inplace=True)
             EXP_date = EXP_unique[0].iloc[-2]
-
-
         else:
             EXP_unique = meta_trade_all_df['expiryDate'].unique()
             EXP_unique = pd.DataFrame(EXP_unique)
             EXP_unique[0] = pd.to_datetime(EXP_unique[0])
             EXP_unique.sort_values(by=0, ascending=False, inplace=True)
             EXP_date = EXP_unique[0].iloc[-1]
+        # print(EXP_date, 'this one')
+        # if StockSymbol == 'NIFTY':
+        #     global index_expiry
+        #     index_expiry = EXP_date
+        # else:
+        #     global stock_expiry
+        #     stock_expiry = EXP_date
 
-        print(EXP_date)
-        if StockSymbol == 'NIFTY':
+        if (meta_trade_all_df['instrumentType'].iloc[0] == 'Stock Futures') | (meta_trade_all_df['instrumentType'].iloc[0] == 'Stock Options'):
+            global stock_expiry
+            stock_expiry = EXP_date
+        else:
             global index_expiry
             index_expiry = EXP_date
-        else:
-            stock_expiry = EXP_date
 
         # create historical
         meta_trade_all_df.drop(['change', 'pchangeinOpenInterest', 'premiumTurnover', 'closePrice'
@@ -132,7 +143,9 @@ def start_thread(StockSymbol,index,s):
         all_stock_df.append(meta_trade_all_csv)
 
         # calculate and add strike price difference to csv
-        meta_trade_all_df = meta_trade_all_df[(meta_trade_all_df['expiryDate'] == EXP_date)]
+        eom_EXP_date = last_day_of_month(EXP_date)
+
+        meta_trade_all_df = meta_trade_all_df[(meta_trade_all_df['expiryDate'] <= eom_EXP_date)]
         first_row_spd_df = meta_trade_all_df[
             (meta_trade_all_df['strikePrice'] >= strike_price_new) & (meta_trade_all_df['optionType'] == 'Call')]
 
@@ -190,8 +203,9 @@ def start_thread(StockSymbol,index,s):
 
 
 get_data = pd.read_csv(METADATA_DIR + '//stockmetadata_nse_fut.csv')
+# get_data = get_data.head(40)
 get_data.sort_values(by=['SYMBOL'], ascending=True, inplace=True)
-# uniqueValues = ['NIFTY', 'BANKNIFTY', 'PAGEIND','APOLLOTYRE','CADILAHC']
+# uniqueValues = ['NIFTY', 'BANKNIFTY','APOLLOTYRE']
 uniqueValues = get_data['SYMBOL'].unique()
 
 s = requests.session()
@@ -199,6 +213,7 @@ url = "https://www.nseindia.com/"
 s.get(url, headers=headers)
 index = 0
 for Symbol in uniqueValues:
+    ic(Symbol)
     t1 = threading.Thread(target=start_thread, args=(Symbol, index, s))
     t1.start()
     index = index + 1
@@ -217,7 +232,7 @@ df_final_all = pd.concat(df_final_all)
 df_itm_opt_wrt_all = pd.concat(df_itm_opt_wrt_all)
 
 
-#writing to csv, rename & drop columns
+# writing to csv, rename & drop columns
 
 if not os.path.exists(PROCESSED_DIR + '\\option' + '\\opt_chain_all_hist_' + sub_string_date + '.csv'):
     all_stock_df['expiryDate'] = all_stock_df['expiryDate'].dt.strftime('%d-%m-%Y')
@@ -258,17 +273,24 @@ if not os.path.exists(PROCESSED_DIR + '\\option' + '\\opt_chain_filtred_3L_3KV_1
 
     df_final_all['date_today'] = df_final_all['date_today'].dt.strftime('%d-%m-%Y')
     df_exp = df_final_all[df_final_all['expiryDate'] == index_expiry]
-    df_exp = df_exp[(df_exp['STOCK'] == 'NIFTY') | (df_exp['STOCK'] == 'BANKNIFTY')]
+    df_exp = df_exp[(df_exp['STOCK'] == 'NIFTY') | (df_exp['STOCK'] == 'BANKNIFTY')| (df_exp['STOCK'] == 'FINNIFTY')]
     df_exp = df_exp[(df_exp['optionType'] == 'Call') | (df_exp['optionType'] == 'Put')]
     df_exp.sort_values(by=['STOCK', 'optionType', 'strikePrice'], ascending=True, inplace=True)
     df_exp.drop(['OPEN', 'HIGH', 'CLOSE', 'LTP', 'LOW', 'pChange', 'CONTRACTS', 'identifier', 'instrumentType', '%_of_OI',
                  'strikePrice_ATM_top', 'strikePrice_ATM_down'], inplace=True, axis=1)
     # df_exp['date_today'] = df_exp['date_today'].dt.strftime('%d-%m-%Y')
     df_exp.to_csv(RAW_DIR + '\\BN_Nifty_Major_opt_tab.csv', index=None)
+    df_month_exp = df_final_all[df_final_all['expiryDate'] == stock_expiry]
+    df_month_exp = df_month_exp[(df_month_exp['STOCK'] == 'NIFTY') | (df_month_exp['STOCK'] == 'BANKNIFTY')]
+    df_month_exp = df_month_exp[(df_month_exp['optionType'] == 'Call') | (df_month_exp['optionType'] == 'Put')]
+    df_month_exp.sort_values(by=['STOCK', 'optionType', 'strikePrice'], ascending=True, inplace=True)
+    df_month_exp.drop(
+        ['OPEN', 'HIGH', 'CLOSE', 'LTP', 'LOW', 'pChange', 'CONTRACTS', 'identifier', 'instrumentType', '%_of_OI',
+         'strikePrice_ATM_top', 'strikePrice_ATM_down'], inplace=True, axis=1)
+    df_month_exp.to_csv(RAW_DIR + '\\fut_BN_Nifty_Major_monthly_exp.csv', index=None)
 
     df_final_all['expiryDate'] = df_final_all['expiryDate'].dt.strftime('%d-%m-%Y')
     df_final_all.to_csv(PROCESSED_DIR + '\\option' + '\\opt_chain_filtred_3L_3KV_10pmatm_' + EXP_date + '.csv', index=None)
-
 else:
     Historical_df_final_all = pd.read_csv(PROCESSED_DIR + '\\option' + '\\opt_chain_filtred_3L_3KV_10pmatm_' + EXP_date +'.csv')
     Historical_df_final_all['expiryDate'] = pd.to_datetime(Historical_df_final_all['expiryDate'], format='%d-%m-%Y')
@@ -280,16 +302,24 @@ else:
 
         Historical_df_final_all['date_today'] = Historical_df_final_all['date_today'].dt.strftime('%d-%m-%Y')
         df_exp = Historical_df_final_all[Historical_df_final_all['expiryDate'] == index_expiry]
-        df_exp = df_exp[(df_exp['STOCK'] == 'NIFTY') | (df_exp['STOCK'] == 'BANKNIFTY')]
+        df_exp = df_exp[(df_exp['STOCK'] == 'NIFTY') | (df_exp['STOCK'] == 'BANKNIFTY') | (df_exp['STOCK'] == 'FINNIFTY')]
         df_exp = df_exp[(df_exp['optionType'] == 'Call') | (df_exp['optionType'] == 'Put')]
         df_exp.sort_values(by=['STOCK', 'optionType', 'strikePrice'], ascending=True, inplace=True)
         df_exp.drop(['OPEN', 'HIGH', 'CLOSE', 'LTP', 'LOW', 'pChange', 'CONTRACTS', 'identifier', 'instrumentType', '%_of_OI',
                      'strikePrice_ATM_top', 'strikePrice_ATM_down'], inplace=True, axis=1)
         df_exp.to_csv(RAW_DIR + '\\BN_Nifty_Major_opt_tab.csv', index=None)
+        df_month_exp = Historical_df_final_all[Historical_df_final_all['expiryDate'] == stock_expiry]
+        df_month_exp = df_month_exp[(df_month_exp['STOCK'] == 'NIFTY') | (df_month_exp['STOCK'] == 'BANKNIFTY')
+                                    | (df_month_exp['STOCK'] == 'FINNIFTY')]
+        df_month_exp = df_month_exp[(df_month_exp['optionType'] == 'Call') | (df_month_exp['optionType'] == 'Put')]
+        df_month_exp.sort_values(by=['STOCK', 'optionType', 'strikePrice'], ascending=True, inplace=True)
+        df_month_exp.drop(
+            ['OPEN', 'HIGH', 'CLOSE', 'LTP', 'LOW', 'pChange', 'CONTRACTS', 'identifier', 'instrumentType', '%_of_OI',
+             'strikePrice_ATM_top', 'strikePrice_ATM_down'], inplace=True, axis=1)
+        df_month_exp.to_csv(RAW_DIR + '\\fut_BN_Nifty_Major_monthly_exp.csv', index=None)
 
         Historical_df_final_all['expiryDate'] = Historical_df_final_all['expiryDate'].dt.strftime('%d-%m-%Y')
         Historical_df_final_all.to_csv(PROCESSED_DIR + '\\option' + '\\opt_chain_filtred_3L_3KV_10pmatm_' + EXP_date + '.csv', index=None)
-
 
 df_itm_opt_wrt_all['expiryDate'] = df_itm_opt_wrt_all['expiryDate'].dt.strftime('%d-%m-%Y')
 df_itm_opt_wrt_all['date_today'] = df_itm_opt_wrt_all['date_today'].dt.strftime('%d-%m-%Y')
