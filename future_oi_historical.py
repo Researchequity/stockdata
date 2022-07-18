@@ -239,7 +239,7 @@ def mwpl_cli_report():
     os.remove(RAW_DIR + '\\mwpl_cli_{}.xls'.format(str_date))
 
     df_output.to_csv(RAW_DIR+'//fut_Today_yesterday.csv', index=None)
-    new_df.to_csv(RAW_DIR + '//fut_Historical_data.csv')
+    new_df.to_csv(RAW_DIR + '//fut_Historical_data.csv', index=None)
 
 
 def get_opt_data():
@@ -339,7 +339,7 @@ def load_fut_dashboard():
     last_full_Week_df = pd.DataFrame(last_full_Week_df)
     # last_full_Week_df.to_csv(r'\\192.168.41.190\program\stockdata\raw\asasa.csv')
     get_filt_data = last_full_Week_df[(last_full_Week_df['SYMBOL'] == 'NIFTY') | (
-            last_full_Week_df['SYMBOL'] == 'BANKNIFTY')]  # (last_full_Week_df['SYMBOL'] == 'FINNIFTY') |
+            last_full_Week_df['SYMBOL'] == 'BANKNIFTY') | (last_full_Week_df['SYMBOL'] == 'FINNIFTY')]  # (last_full_Week_df['SYMBOL'] == 'FINNIFTY') |
     get_filt_data = pd.DataFrame(get_filt_data)
 
     min_max_df = hist_data_grp_daily_df.groupby(['SYMBOL']).agg({'OPEN_INT_sum': ['max', 'mean', 'min']}).reset_index()
@@ -440,14 +440,18 @@ def get_fao_participant(Hist_date=None):
     # str_date = '17062021'
     # get and read csv
     print(str_date)
-
-    dls = "https://archives.nseindia.com/content/nsccl/fao_participant_oi_{}.csv".format(str_date)
-    urllib.request.urlretrieve(dls, RAW_DIR + "\\fao_participant_oi_{}.csv".format(str_date))  # For Python 3
-
-    today_df = pd.read_csv(RAW_DIR + '\\fao_participant_oi_{}.csv'.format(str_date), skiprows=1)
-
+    try:
+        dls = "https://archives.nseindia.com/content/nsccl/fao_participant_oi_{}.csv".format(str_date)
+        urllib.request.urlretrieve(dls, RAW_DIR + "\\fao_participant_oi_{}.csv".format(str_date))  # For Python 3
+        today_df = pd.read_csv(RAW_DIR + '\\fao_participant_oi_{}.csv'.format(str_date), skiprows=1)
+    except:
+        print('old website nse')
+        dls = "https://www1.nseindia.com/content/nsccl/fao_participant_oi_{}.csv".format(str_date)
+        urllib.request.urlretrieve(dls, RAW_DIR + "\\fao_participant_oi_{}.csv".format(str_date))  # For Python 3
+        today_df = pd.read_csv(RAW_DIR + '\\fao_participant_oi_{}.csv'.format(str_date), skiprows=1)
     os.remove(RAW_DIR + '\\fao_participant_oi_{}.csv'.format(str_date))
     today_df = pd.DataFrame(today_df)
+
     today_df['Date'] = str_date
     today_df['Date'] = pd.to_datetime(str_date, format='%d%m%Y')
     today_df.drop(labels=[4], axis=0, inplace=True)  # remove row 'total'
@@ -774,7 +778,7 @@ def load_csv_to_excel():
 
     sheet_oi_single = wb.sheets('indx_comm')
     sheet_oi_single.clear()
-    indx_comm = pd.read_csv(RAW_DIR + '\\daily_ind_comm.csv')
+    indx_comm = pd.read_csv(r'\\192.168.41.190\kinjal\daily_ind_comm.csv')
     indx_comm['Date'] = pd.to_datetime(indx_comm['Date'], format='%d-%m-%Y')
     indx_comm['Date'] = indx_comm['Date'].dt.strftime('%d-%m-%Y')
     sheet_oi_single.range("A1").options(index=None).value = indx_comm
