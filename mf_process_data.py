@@ -24,7 +24,14 @@ def mutual_fund():
     final_df = pd.DataFrame(final_df)
     final_df = final_df.fillna(0)
 
-    # filters
+    # filters to exclude not yet data updated
+    final_df = final_df[final_df['ISIN'] != 0]
+    test_df = final_df.groupby(['Instrument Name']).agg(
+        {'Market Value (Cr.)_current': ['sum']}).reset_index()
+    test_df.columns = ['Instrument Name', 'Mrkt_Val_sum']
+    final_df = pd.merge(final_df, test_df, on=['Instrument Name'], how='left')
+    final_df = final_df[final_df['Mrkt_Val_sum'] > 0]
+    final_df.drop(['Mrkt_Val_sum'], inplace=True, axis=1)
     # final_df = final_df[final_df['Market Value (Cr.)_current'] != 0]
     # final_df = final_df[final_df['Company s Mkt Cap (Cr.)'] != 0]
     # final_df = final_df[final_df['No. of Shares_current'] != 0]
