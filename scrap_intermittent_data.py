@@ -8,8 +8,13 @@ from email.utils import make_msgid
 from datetime import datetime as dt
 from utils import *
 import urllib
+import re
 from urllib.request import urlopen
 import dataframe_image as dfi
+import warnings
+
+warnings.simplefilter(action="ignore", category=Warning)
+
 
 file = os.path.basename(__file__)
 pd.set_option('display.max_columns', None)
@@ -32,26 +37,29 @@ def week_high():
     df['Date'] = pd.to_datetime(df['Date'], format='%d-%m-%Y')
     df.sort_values(by=['Date'], inplace=True, ascending=True)
 
-    df = df[df['Date'] >= (pd.datetime.today() - pd.Timedelta(days=90)).strftime("%d-%m-%Y")]
+    #date_format="%d-%m-%Y"
+    date_format="%Y-%m-%d"
+
+    df = df[df['Date'] >= (pd.datetime.today() - pd.Timedelta(days=90)).strftime(date_format)]
 
     data = []
     sript_name_list = df['Security Name'].unique().tolist()
     for sn in sript_name_list:
         merge_sn = df[df['Security Name'] == sn]
 
-        merge_sn['Date'] = pd.to_datetime(merge_sn['Date'], format='%d-%m-%Y')
+        merge_sn['Date'] = pd.to_datetime(merge_sn['Date'], format=date_format)
         merge_sn.sort_values(by=['Date'], inplace=True, ascending=True)
 
         Script_Code = merge_sn['Security Code'].tail(1).tolist()
         Latest_52_Wk_High_Date = merge_sn['Date'].tail(1).tolist()
 
-        Last30_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=30)).strftime("%d-%m-%Y")]
+        Last30_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=30)).strftime(date_format)]
         Last30_Days = len(Last30_Days['Security Name'])
 
-        Last60_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=60)).strftime("%d-%m-%Y")]
+        Last60_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=60)).strftime(date_format)]
         Last60_Days = len(Last60_Days['Security Name'])
 
-        Last90_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=90)).strftime("%d-%m-%Y")]
+        Last90_Days = merge_sn[merge_sn['Date'] >= (pd.datetime.today() - pd.Timedelta(days=90)).strftime(date_format)]
         Last90_Days = len(Last90_Days['Security Name'])
 
         data.append([Script_Code[0], sn, Latest_52_Wk_High_Date[0], Last30_Days, Last60_Days, Last90_Days])
@@ -65,11 +73,22 @@ def week_high():
     StockMetadata['script_code']=StockMetadata['script_code'].astype('object')
     merge = pd.merge(table_df_csv, StockMetadata, on=['script_code'], how='left')
 
+    vsm = merge[(merge['MarketCap'] == 'VSM')]
+    vsm = vsm[((vsm['totalMarketCap'] > 10000) & (vsm['Last30_Days'] > 0))]
+    vsm.sort_values(by=['Last30_Days'], inplace=True, ascending=False)
+
+    merge = merge[((merge['MarketCap'] == 'LARGE') | (merge['MarketCap'] == 'Mid'))]
+    merge.sort_values(by=['Latest 52 Weeks High Date', 'Last30_Days'], inplace=True, ascending=False)
+    #print(merge)
 
     workbook = xw.Book(REPORT_DIR+'\\'+'intermedent.xlsm')
     ws1 = workbook.sheets['52_Wk_High_Data_Summary']
     ws1.clear()
     ws1.range("A1").options(index=None).value = merge
+
+    ws1 = workbook.sheets['52_Wk_High_VSM_Summary']
+    ws1.clear()
+    ws1.range("A1").options(index=None).value = vsm
 
 
 def count_announcement():
@@ -143,10 +162,136 @@ def count_announcement():
     AVG = pivot[pivot.columns[4:len(pivot.columns)]]
     pivot['Ratio_Avg'] = pivot[pivot.columns[2]] / (AVG.mean(axis=1))
 
+    data = pd.read_csv(METADATA_DIR+'\\'+'Historical_Announcement.csv')
+    data = data[data['name'].str.contains(Pattern)]
+    data = data.reset_index(drop=True)
+
+    data['Exchange_Received'] = pd.to_datetime(data['Exchange_Received'], format='%d-%m-%Y %H:%M')
+    data.sort_values(by=['Exchange_Received'], inplace=True, ascending=False)
+    arr = []
+    for pi in range(0, len(pivot)):
+        new_data = pivot.iloc[[pi]]
+        sccode = new_data['script_code'].tolist()
+        scdata = data[data['script_code'] == sccode[0]]
+        new_data['latest_date'] = scdata['Exchange_Received'].max()
+        arr.append(new_data)
+        # break
+
+    pivot = pd.concat(arr)
+    pivot['latest_date'] = pd.to_datetime(pivot['latest_date'], format='%d-%m-%Y %H:%M')
+    pivot.sort_values(by=['latest_date'], inplace=True, ascending=False)
+    pivot['latest_date'] = pivot['latest_date'].dt.strftime('%d-%m-%Y')
+
     workbook = xw.Book(REPORT_DIR+'\\'+'intermedent.xlsm')
     ws1 = workbook.sheets['Count_Investor_Meet']
     ws1.clear()
     ws1.range('A1').options(index=False).value = pivot
+    workbook.save()
+
+
+def Resignation_Summary():
+    data = pd.read_csv(METADATA_DIR+'\\'+'Historical_Announcement.csv')
+
+    Pattern = re.compile('Resignation')
+    data = data[data['name'].str.contains(Pattern)]
+    data = data.reset_index(drop=True)
+
+    data['Exchange_Received'] = pd.to_datetime(data['Exchange_Received'], format='%d-%m-%Y %H:%M')
+    data.sort_values(by=['Exchange_Received'], inplace=True, ascending=False)
+
+    df = data
+    qtr = []
+
+    for val in df['Exchange_Received']:
+        quarter = (val.month - 1) // 3 + 1
+        if quarter == 4:
+            Qtr_date = datetime.datetime(val.year, 12, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 1:
+            Qtr_date = datetime.datetime(val.year, 3, 31)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        elif quarter == 2:
+            Qtr_date = datetime.datetime(val.year, 6, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+        else:
+            Qtr_date = datetime.datetime(val.year, 9, 30)
+            qtr_mon = Qtr_date.strftime('%B')
+            qtr_year = Qtr_date.year
+            str_date = str(qtr_mon) + ' ' + str(qtr_year)
+            qtr.append(str_date)
+            qtr.append(val)
+
+    qtr_df = pd.DataFrame(qtr)
+    qtr_df = pd.DataFrame(qtr_df.values.reshape(-1, 2), columns=['qtr', 'Reported_toExchange_Date'])
+    qtr_df.drop_duplicates(subset=['qtr', 'Reported_toExchange_Date'], inplace=True)
+
+    qtr_df = qtr_df[['Reported_toExchange_Date', 'qtr']]
+    qtr_df.rename(columns={'Reported_toExchange_Date': 'Exchange_Received'}, inplace=True)
+    qtr_df = pd.merge(qtr_df, df, on=['Exchange_Received'], how='left')
+
+    qtrdata = qtr_df['qtr'].unique().tolist()
+
+    df_merge = pd.DataFrame()
+    for q in range(0, len(qtrdata)):
+        data = qtr_df[qtr_df['name'].str.contains(Pattern) & qtr_df['qtr'].str.contains(qtrdata[q])]
+        group = data.groupby(['name', 'script_code', 'qtr']).size().sort_values(ascending=False).reset_index(
+            name='count')
+        df_merge = pd.concat([df_merge, group], ignore_index=True)
+
+    pivot = pd.pivot_table(df_merge, index=['script_code'], columns=['qtr'], values=['count'], aggfunc=np.sum)
+
+    pivot.columns = pivot.columns.droplevel(0)
+    pivot = pivot.reset_index().rename_axis(None, axis=1)
+
+    data = pd.read_csv(METADATA_DIR+'\\'+'Historical_Announcement.csv')
+
+    Pattern = re.compile('Resignation')
+    data = data[data['name'].str.contains(Pattern)]
+    data = data.reset_index(drop=True)
+
+    data['Exchange_Received'] = pd.to_datetime(data['Exchange_Received'], format='%d-%m-%Y %H:%M')
+    data.sort_values(by=['Exchange_Received'], inplace=True, ascending=False)
+    arr = []
+    for pi in range(0, len(pivot)):
+        new_data = pivot.iloc[[pi]]
+        sccode = new_data['script_code'].tolist()
+        scdata = data[data['script_code'] == sccode[0]]
+        new_data['name'] = scdata['name'].min()
+        new_data['latest_date'] = scdata['Exchange_Received'].max()
+        arr.append(new_data)
+
+    arr_data = pd.concat(arr)
+    qtrdata.insert(0, 'latest_date')
+    qtrdata.insert(0, 'script_code')
+    qtrdata.insert(0, 'name')
+
+    arr_data = arr_data[qtrdata]
+    arr_data['latest_date'] = pd.to_datetime(arr_data['latest_date'], format='%d-%m-%Y %H:%M')
+    arr_data.sort_values(by=['latest_date'], inplace=True, ascending=False)
+    arr_data['latest_date'] = arr_data['latest_date'].dt.strftime('%d-%m-%Y')
+
+
+    metadata = pd.read_csv(METADATA_DIR+'\\'+'StockMetadata.csv')[['script_code', 'MarketCap']]
+    arr_data['script_code'] = arr_data['script_code'].str.replace('DVR', '0')
+    arr_data['script_code'] = arr_data['script_code'].astype(float)
+    arr_data = pd.merge(arr_data, metadata, on=['script_code'], how='left')
+
+    workbook = xw.Book(REPORT_DIR + '\\' + 'intermedent.xlsm')
+    ws1 = workbook.sheets['Resignation_Summary']
+    ws1.clear()
+    ws1.range('A1').options(index=False).value = arr_data
     workbook.save()
 
 
@@ -1363,6 +1508,8 @@ if __name__ == '__main__':
         ic('count_announcement')
         investor_meet_by_participant()
         ic('investor_meet_by_participant')
+        Resignation_Summary()
+        ic('Resignation_Summary')
 
     except Exception as e:
         print(e)
