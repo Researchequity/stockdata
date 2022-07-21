@@ -1,3 +1,4 @@
+
 from sklearn.feature_extraction.text import CountVectorizer
 import pdfplumber as pdf
 import os
@@ -13,10 +14,11 @@ from datetime import datetime
 import time
 import PyPDF2
 import glob
+
 from nltk.sentiment.vader import SentimentIntensityAnalyzer as SIA
 from tkinter import filedialog
 import tkinter as tk
-directory = filedialog.askdirectory()
+directory =  filedialog.askdirectory()
 s1= directory[0:2]
 if s1 == "D:" :
     print("Directory is - " + str(s1))
@@ -25,110 +27,110 @@ else:
     repl = repl.replace('\\', '/')
     path = directory.replace(s1, repl)
     directory = directory.replace(s1, repl)
-path = directory + "/**/*.txt"
+path = directory + "/*.pdf"
 files= glob.glob(path)
-
-fz= pd.DataFrame(files)
-z= len(files)
+dfbz= len(files)
 k=0
-file = files
-filesprocessed = []
-x=files[24]
-for x in file:
-    k=k+1
-    df = open(x, 'r+', encoding='latin')
-    df = df.read()
-    text = str(df)
-    rep = pd.read_csv(r"//192.168.41.190/nilesh/concall/Replace.csv")
-    close = True
-    rep = rep.dropna(subset=['Keyword'])
-    for i in range(len(rep)):
-        for i in range(len(rep)):
-            repl = str(rep['Replace'].iloc[i])
-            subs = str(rep['Keyword'].iloc[i])
-            compiled = re.compile(re.escape(subs), re.IGNORECASE)
-            text = compiled.sub(repl, text)
-        rep = pd.read_csv((r"//192.168.41.190/nilesh/concall/Replace.csv"))
-        rep = rep.dropna(subset=['Keyword'])
-        KEYWORD = rep['Keyword'].iloc[i]
-        #KEYWORD = easygui.enterbox("Enter the Keyword to search pattern")
-        m = re.compile(f'{KEYWORD}[,|\s]*(\w+)')
-        words = m.findall(text)
-        words = [KEYWORD + " " + sub for sub in words]
-        words = list(set(words))
-        if len(words) > 1:
-            xword = easygui.multchoicebox("Select Words to add in delete list", choices=words)
-            xword = pd.DataFrame(xword)
-        else:
-            xword = []
-            if len(words) > 0:
-                words.append(None)
-                words.append(None)
-                xword.append(easygui.choicebox("Select Words to add in delete list", choices=words))
-                xword = pd.DataFrame(xword)
-        if len(xword) > 0:
-            xword.columns = ['Keyword']
-            xword['S.no'] = xword.index
-            xword['Pos'] = 0
-            xword['Neg'] = 0
-            xword['Compound'] = 0
-            xword['Replace'] = ''
-            xword = xword.reindex(['S.no', 'Keyword', 'Pos', 'Neg', 'Compound', 'Replace'], axis=1)
-            rep = pd.concat([rep, xword])
-            rep = rep.drop_duplicates(subset=['Keyword'])
-            rep.to_csv(r"//192.168.41.190/nilesh/concall/Replace.csv", index=False)
 
-    data = text.split(". ")
-    data = pd.DataFrame(data)
-    rep = rep.dropna(subset=['Keyword'])
-    data.columns = ['text']
-    def check(data):
-        data1 = data
-        results = []
-        data1 = pd.DataFrame(data1)
-        data1.columns = ['Col1']
-        for headline in data1['Col1']:
-            pol_score = SIA().polarity_scores(headline)  # run analysis
-            pol_score['headline'] = headline  # add headlines for viewing
-            results.append(pol_score)
-        results
-        res = pd.DataFrame(results)
-        return (res)
-    xx = check(data)
-    file = os.path.basename(x)
-    filename = str(file).replace(".txt", "")
-    fname = filename.split("_")
-    fname = fname[0]
-    qtr = filename[-8:]
-    if fname.isnumeric():
-      scode = fname
-      cck = 0
-    elif fname.isalpha():
-      Com = fname
-      cck=1
-    xx.neg.sum()
-    if cck==0:
-      Com = scode
-    file = str("//192.168.41.190/nilesh/concall/")+str(filename)
-    file = str(file) + ".csv"
-    xx.to_csv(file)
-    qtr = qtr.replace("_","-")
+filesprocessed = []
+
+for x in files:
     try:
-        Date = pd.to_datetime(qtr, format="%b-%Y")
+        filesprocessed.append(x)
+        k=k+1
+        text = " "
+        pdff = pdf.open(x)
+        for i in range(0, len(pdff.pages)):
+            page = pdff.pages[i]
+            txt =  page.extract_text()
+            if txt is None:
+                print(str(x) + "of page is "+ str(i) + "is empty")
+            else:
+                text = text + txt
+        text = str(text)
+        text = str(text)
+        rep = pd.read_csv(r"//192.168.41.190/nilesh/concall/Replace.csv")
+        close = True
+        rep = rep.dropna(subset=['Keyword'])
+        for i in range(len(rep)):
+            for i in range(len(rep)):
+                repl = str(rep['Replace'].iloc[i])
+                subs = str(rep['Keyword'].iloc[i])
+                compiled = re.compile(re.escape(subs), re.IGNORECASE)
+                text = compiled.sub(repl, text)
+            rep = pd.read_csv((r"//192.168.41.190/nilesh/concall/replace/Replace.csv"))
+            rep = rep.dropna(subset=['Keyword'])
+            KEYWORD = rep['Keyword'].iloc[i]
+            #KEYWORD = easygui.enterbox("Enter the Keyword to search pattern")
+            m = re.compile(f'{KEYWORD}[,|\s]*(\w+)')
+            words = m.findall(text)
+            words = [KEYWORD + " " + sub for sub in words]
+            words = list(set(words))
+            if len(words) > 1:
+                xword = easygui.multchoicebox("Select Words to add in delete list", choices=words)
+                xword = pd.DataFrame(xword)
+            else:
+                xword = []
+                if len(words) > 0:
+                    words.append(None)
+                    words.append(None)
+                    xword.append(easygui.choicebox("Select Words to add in delete list", choices=words))
+                    xword = pd.DataFrame(xword)
+            if len(xword) > 0:
+                xword.columns = ['Keyword']
+                xword['S.no'] = xword.index
+                xword['Pos'] = 0
+                xword['Neg'] = 0
+                xword['Compound'] = 0
+                xword['Replace'] = ''
+                xword = xword.reindex(['S.no', 'Keyword', 'Pos', 'Neg', 'Compound', 'Replace'], axis=1)
+                rep = pd.concat([rep, xword])
+                rep = rep.drop_duplicates(subset=['Keyword'])
+                rep.to_csv(r"//192.168.41.190/nilesh/concall/Replace.csv", index=False)
+
+        data = text.split(". ")
+        data = pd.DataFrame(data)
+        rep = rep.dropna(subset=['Keyword'])
+        data.columns = ['text']
+        def check(data):
+            data1 = data
+            results = []
+            data1 = pd.DataFrame(data1)
+            data1.columns = ['Col1']
+            for headline in data1['Col1']:
+                pol_score = SIA().polarity_scores(headline)  # run analysis
+                pol_score['headline'] = headline  # add headlines for viewing
+                results.append(pol_score)
+            results
+            res = pd.DataFrame(results)
+            return (res)
+        xx = check(data)
+        file = os.path.basename(x)
+        filename = str(file).replace(".pdf", "")
+        qtr = filename[-7:]
+        Com = filename[:6]
+        xx.neg.sum()
+        file = str("//192.168.41.190/nilesh/concall/concall/")+str(filename)
+        file = str(file) + ".csv"
+        xx.to_csv(file)
+        qtr = qtr.replace("_","-")
+        Date = filename[-10:]
+        x = pd.DataFrame([[Com,filename,  xx.neg.sum(), xx.neu.sum(),xx.pos.sum(), xx.compound.sum(), qtr,Date]])
+        x.columns=['Company','File Name', 'Negative', 'Neutral', 'Positive', 'Compound','Qtr','Date']
+        status = int(z-k)
+        print(str(status) + " Files Left")
+        path = r"//192.168.41.190/nilesh/SA_Score.csv"
+        score = pd.read_csv(path)
+        score = pd.concat([score, x])
+        #score = score.drop_duplicates(subset='File Name', keep = 'last')
+        score.to_csv(path, index=False)
     except:
-        print(i)
-    x = pd.DataFrame([[Com,filename,  xx.neg.sum(), xx.neu.sum(),xx.pos.sum(), xx.compound.sum(), qtr,Date]])
-    x.columns=['Company','File Name', 'Negative', 'Neutral', 'Positive', 'Compound','Qtr','Date']
-    status = int(z-k)
-    print(str(status) + " Files Left")
-    path = r"//192.168.41.190/nilesh/NSA_Score.csv"
-    score = pd.read_csv(path)
-    score = pd.concat([score, x])
-    score = score.drop_duplicates(subset='File Name', keep = 'last')
-    score.to_csv(path, index=False)
+        print("Error Occured in " + str(x))
+
+zzz = pd.DataFrame(filesprocessed)
 while close == True:
-    #KEYWORD = rep['Keyword'].ilo
-    #f
+#KEYWORD = rep['Keyword'].ilo
+    #
     # [i]
     for i in range(len(rep)):
         repl = str(rep['Replace'].iloc[i])
@@ -163,10 +165,8 @@ while close == True:
         rep = rep.drop_duplicates(subset=['Keyword'])
         rep.to_csv(r"//192.168.41.190/nilesh/concall/Replace.csv", index=False)
     close = easygui.ccbox("Do You want to countinue Adding More words ?")
-
     if close == False:
         break
-
 import pandas as pd
 import datetime as dt
 import numpy as np
