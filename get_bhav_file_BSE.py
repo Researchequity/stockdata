@@ -31,6 +31,7 @@ def get_Bhav_file(dat):
 
 def filter_bhav_copy(bhav_copy):
     bhav_copy = bhav_copy[bhav_copy['SC_GROUP'].apply(lambda element: element.strip()[0]).isin(['A', 'B', 'X', 'XT', 'T','M','MT'])]
+    bhav_copy = bhav_copy[~bhav_copy['SC_NAME'].str.contains('ETF')]
     return bhav_copy
 
 
@@ -41,11 +42,10 @@ def update_master_file(dat):
     bhav_data_bse_master_file = "bhav_data_bse_historical.csv"
     bhav_file_path, str_date = get_Bhav_file(str_date)
 
-
     unzip_folder(bhav_file_path,LOG_FILE_NAME)
     bhav_file_path = bhav_file_path.split(".zip")[0]+".CSV"
     bhav_copy = pd.read_csv(bhav_file_path)
-
+    bhav_copy = bhav_copy[bhav_copy['SC_TYPE'] == 'Q']
     bhav_copy.drop(['SC_TYPE', 'HIGH', 'LAST', 'LOW', 'NET_TURNOV', 'TDCLOINDI', 'FILLER2', 'FILLER3'],
                    axis=1, inplace=True)
     bhav_copy['TRADING_DATE'] = pd.to_datetime(bhav_copy['TRADING_DATE'], format='%d-%b-%y')
@@ -80,14 +80,10 @@ def update_master_file(dat):
     return bhav_file_path, str_date
 
 
-#if __name__ == '__main__':
-#     update_master_file(date_today)
-
-
 def get_historical_file(HISTORICAL_DATA=0):
     if HISTORICAL_DATA == 1:
         start_date = datetime.date(day=1, month=1, year=2021)
-        end_date = datetime.date(day=21, month=12, year=2021)
+        end_date = datetime.date(day=2, month=3, year=2022)
         totaldays = (end_date - start_date).days
         for i in range(totaldays + 1):
 
